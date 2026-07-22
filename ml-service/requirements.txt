@@ -1,0 +1,25 @@
+fastapi==0.110.0
+uvicorn[standard]==0.27.0
+pydantic==2.10.6
+scikit-learn==1.6.1
+numpy==2.1.0
+pandas==2.2.3
+joblib==1.4.2
+python-dotenv==1.0.1
+
+
+
+# Create virtual environment
+# python -m venv venv
+
+# # Activate it (Windows PowerShell)
+# .\venv\Scripts\Activate.ps1
+
+# # Install dependencies
+# pip install -r requirements.txt
+
+# # Train the model (optional but recommended)
+# python -m app.models.train_model
+
+# # Start the server
+# uvicorn app.main:app --reload --port 8000
