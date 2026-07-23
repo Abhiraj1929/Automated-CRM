@@ -1,14 +1,15 @@
 // ============================================================
-// Dashboard Routes - API endpoints for analytics and stats
+// Dashboard Routes - Analytics with RBAC
 // ============================================================
 const express = require("express");
 const router = express.Router();
-const { getDashboardStats, getRevenueAnalytics } = require("../controllers/dashboardController");
+const { getDashboardStats } = require("../controllers/dashboardController");
+const { authenticate } = require("../middleware/auth");
+
+// All routes require authentication
+router.use(authenticate);
 
 // GET /api/dashboard/stats - Get dashboard statistics
 router.get("/stats", getDashboardStats);
-
-// GET /api/dashboard/revenue - Get revenue analytics
-router.get("/revenue", getRevenueAnalytics);
 
 module.exports = router;

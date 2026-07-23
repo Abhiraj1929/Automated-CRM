@@ -1,355 +1,236 @@
 // ============================================================
-// Lead Controller - Handles all lead-related operations
+// Lead Controller - Lead management with conversion
 // ============================================================
 const { supabase } = require("../config/supabase");
-const axios = require("axios");
+const { logActivity } = require("../middleware/activityLogger");
+const { logAudit } = require("../services/auditService");
+const { runWorkflow } = require("../services/workflowEngine");
+const { scoreAndUpdateLead } = require("../services/scoringService");
+const { findDuplicateLeads } = require("../services/duplicateService");
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
-
-/**
- * @desc    Get all leads with optional filtering
- * @route   GET /api/leads
- * @access  Private
- */
 const getLeads = async (req, res, next) => {
   try {
-    const { status, page = 1, limit = 50, search } = req.query;
+    const { status, search, page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
 
     let query = supabase
       .from("leads")
-      .select("*", { count: "exact" });
+      .select("*, owner:users!leads_owner_id_fkey(id, name, email)", { count: "exact" });
 
-    // Apply filters
-    if (status) {
-      query = query.eq("status", status);
+    if (req.user.role === "employee") query = query.eq("owner_id", req.user.id);
+    else if (req.user.role === "manager") {
+      const { data: team } = await supabase.from("users").select("id").eq("manager_id", req.user.id);
+      query = query.in("owner_id", [req.user.id, ...(team?.map((u) => u.id) || [])]);
     }
 
+    if (status) query = query.eq("status", status);
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
     }
 
-    // Apply pagination and ordering
     const { data, error, count } = await query
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-
-    res.json({
-      success: true,
-      data,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: count,
-        pages: Math.ceil(count / limit),
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+    res.json({ success: true, data, pagination: { page: +page, limit: +limit, total: count, pages: Math.ceil(count / limit) } });
+  } catch (error) { next(error); }
 };
 
-/**
- * @desc    Get single lead by ID
- * @route   GET /api/leads/:id
- * @access  Private
- */
 const getLead = async (req, res, next) => {
   try {
     const { id } = req.params;
-
     const { data, error } = await supabase
       .from("leads")
-      .select("*")
-      .eq("id", id)
-      .single();
+      .select("*, owner:users!leads_owner_id_fkey(id, name, email)")
+      .eq("id", id).single();
 
-    if (error) throw error;
-    if (!data) {
-      return res.status(404).json({ success: false, error: "Lead not found" });
-    }
+    if (error || !data) return res.status(404).json({ success: false, error: "Lead not found" });
 
-    res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
+    const { data: activities } = await supabase
+      .from("activities")
+      .select("id, type, subject, status, due_date, created_at, owner:users!activities_owner_id_fkey(id, name)")
+      .eq("who_id", id).eq("who_type", "lead")
+      .order("created_at", { ascending: false }).limit(10);
+
+    res.json({ success: true, data: { ...data, activities: activities || [] } });
+  } catch (error) { next(error); }
 };
 
-/**
- * @desc    Create new lead
- * @route   POST /api/leads
- * @access  Private
- */
 const createLead = async (req, res, next) => {
   try {
-    const { title, name, email, phone, company, amount, status, tags, notes } = req.body;
+    const { first_name, last_name, email, phone, company, title, industry, source, annual_revenue, number_of_employees, website, description } = req.body;
 
-    // Validate required fields
-    if (!title || !name || !email || !amount) {
-      return res.status(400).json({
-        success: false,
-        error: "Title, name, email, and amount are required",
-      });
+    // Check for duplicates
+    const { duplicates } = await findDuplicateLeads(email, first_name, last_name, company);
+    if (duplicates.length > 0) {
+      return res.status(200).json({ success: true, data: null, warning: "Potential duplicate found", duplicates });
     }
 
     const { data, error } = await supabase
       .from("leads")
-      .insert({
-        title,
-        name,
-        email,
-        phone: phone || null,
-        company: company || null,
-        amount,
-        status: status || "new",
-        lead_score: 0,
-        score_category: "low",
-        tags: tags || [],
-        notes: notes || null,
-        owner_id: "1", // Default owner for demo
-      })
-      .select()
+      .insert({ first_name, last_name, email, phone, company, title, industry, source, annual_revenue, number_of_employees, website, description, owner_id: req.user.id, created_by: req.user.id })
+      .select("*, owner:users!leads_owner_id_fkey(id, name, email)")
       .single();
 
     if (error) throw error;
-
+    logActivity({ userId: req.user.id, action: "lead.created", entityType: "lead", entityId: data.id, details: { name: `${first_name} ${last_name}`, company } });
+    logAudit({ entityType: "lead", entityId: data.id, action: "create", newValues: data, userId: req.user.id, ...req.auditInfo });
+    runWorkflow("lead", "on_create", data, null).catch(() => {});
+    scoreAndUpdateLead(data.id).catch(() => {});
     res.status(201).json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
-/**
- * @desc    Update lead details
- * @route   PUT /api/leads/:id
- * @access  Private
- */
 const updateLead = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-
-    // Remove immutable fields
-    delete updates.id;
-    delete updates.created_at;
-
-    // Add updated timestamp
-    updates.updated_at = new Date().toISOString();
+    // Get old values for audit
+    const { data: oldLead } = await supabase.from("leads").select("*").eq("id", id).single();
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    delete updates.id; delete updates.created_at; delete updates.created_by;
 
     const { data, error } = await supabase
-      .from("leads")
-      .update(updates)
-      .eq("id", id)
-      .select()
+      .from("leads").update(updates).eq("id", id)
+      .select("*, owner:users!leads_owner_id_fkey(id, name, email)")
       .single();
 
     if (error) throw error;
-
+    logActivity({ userId: req.user.id, action: "lead.updated", entityType: "lead", entityId: id });
+    logAudit({ entityType: "lead", entityId: id, action: "update", oldValues: oldLead, newValues: data, userId: req.user.id, ...req.auditInfo });
+    runWorkflow("lead", "on_update", data, oldLead).catch(() => {});
+    scoreAndUpdateLead(id).catch(() => {});
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
-/**
- * @desc    Update lead status (for Kanban drag-drop)
- * @route   PATCH /api/leads/:id/status
- * @access  Private
- */
 const updateLeadStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const valid = ["new", "contacted", "qualified", "unqualified", "converted"];
+    if (!valid.includes(status)) return res.status(400).json({ success: false, error: "Invalid status" });
 
-    // Validate status
-    const validStatuses = ["new", "contacted", "proposal_sent", "won", "lost"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-      });
-    }
-
+    const { data: oldLead } = await supabase.from("leads").select("*").eq("id", id).single();
     const { data, error } = await supabase
-      .from("leads")
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
+      .from("leads").update({ status, updated_at: new Date().toISOString() }).eq("id", id)
+      .select().single();
 
     if (error) throw error;
-
+    logActivity({ userId: req.user.id, action: "lead.status_changed", entityType: "lead", entityId: id, details: { newStatus: status } });
+    logAudit({ entityType: "lead", entityId: id, action: "update", oldValues: { status: oldLead?.status }, newValues: { status }, userId: req.user.id, ...req.auditInfo });
+    runWorkflow("lead", "on_status_change", data, oldLead).catch(() => {});
     res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 /**
- * @desc    Delete a lead
- * @route   DELETE /api/leads/:id
- * @access  Private
+ * Convert lead → Account + Contact + Opportunity
+ * This is the key Salesforce-style conversion
  */
-const deleteLead = async (req, res, next) => {
+const convertLead = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { opportunity_name, opportunity_amount, opportunity_close_date, opportunity_stage } = req.body;
 
-    const { error } = await supabase
-      .from("leads")
-      .delete()
-      .eq("id", id);
+    // Get the lead
+    const { data: lead, error: leadError } = await supabase
+      .from("leads").select("*").eq("id", id).single();
 
-    if (error) throw error;
+    if (leadError || !lead) return res.status(404).json({ success: false, error: "Lead not found" });
+    if (lead.status === "converted") return res.status(400).json({ success: false, error: "Lead already converted" });
 
-    res.json({ success: true, message: "Lead deleted successfully" });
-  } catch (error) {
-    next(error);
-  }
-};
+    // 1. Create Account
+    const { data: account, error: accError } = await supabase
+      .from("accounts")
+      .insert({
+        name: lead.company || `${lead.first_name} ${lead.last_name}'s Company`,
+        industry: lead.industry,
+        website: lead.website,
+        phone: lead.phone,
+        email: lead.email,
+        annual_revenue: lead.annual_revenue,
+        number_of_employees: lead.number_of_employees,
+        owner_id: lead.owner_id,
+        created_by: req.user.id,
+      })
+      .select().single();
 
-/**
- * @desc    Get AI lead score prediction
- * @route   POST /api/leads/score
- * @access  Private
- */
-const scoreLead = async (req, res, next) => {
-  try {
-    const { leadId, email, company, industry, companySize, leadSource, pageViews, timeOnSite } = req.body;
+    if (accError) throw accError;
 
-    if (!leadId || !email) {
-      return res.status(400).json({
-        success: false,
-        error: "leadId and email are required",
-      });
+    // 2. Create Contact
+    const { data: contact, error: conError } = await supabase
+      .from("contacts")
+      .insert({
+        first_name: lead.first_name,
+        last_name: lead.last_name,
+        email: lead.email,
+        phone: lead.phone,
+        title: lead.title,
+        account_id: account.id,
+        lead_source: lead.source,
+        owner_id: lead.owner_id,
+        created_by: req.user.id,
+      })
+      .select().single();
+
+    if (conError) throw conError;
+
+    // 3. Create Opportunity (optional)
+    let opportunity = null;
+    if (opportunity_name) {
+      const { data: opp, error: oppError } = await supabase
+        .from("opportunities")
+        .insert({
+          name: opportunity_name,
+          account_id: account.id,
+          contact_id: contact.id,
+          stage: opportunity_stage || "prospecting",
+          amount: opportunity_amount || 0,
+          close_date: opportunity_close_date,
+          owner_id: lead.owner_id,
+          created_by: req.user.id,
+        })
+        .select().single();
+
+      if (oppError) throw oppError;
+      opportunity = opp;
     }
 
-    // Call Python ML Service for prediction
-    const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict-score`, {
-      lead_id: leadId,
-      email,
-      company,
-      industry,
-      company_size: companySize,
-      lead_source: leadSource,
-      page_views: pageViews,
-      time_on_site: timeOnSite,
-    }, {
-      timeout: 10000,
-    });
-
-    const { score, confidence, factors } = mlResponse.data;
-
-    // Determine score category
-    let scoreCategory = "low";
-    if (score >= 70) scoreCategory = "high";
-    else if (score >= 40) scoreCategory = "medium";
-
-    // Update lead in database
-    const { data, error } = await supabase
+    // 4. Update lead as converted
+    await supabase
       .from("leads")
       .update({
-        lead_score: score,
-        score_category: scoreCategory,
+        status: "converted",
+        converted_account_id: account.id,
+        converted_contact_id: contact.id,
+        converted_opportunity_id: opportunity?.id || null,
+        converted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", leadId)
-      .select()
-      .single();
+      .eq("id", id);
 
-    if (error) throw error;
+    logActivity({
+      userId: req.user.id, action: "lead.converted", entityType: "lead", entityId: id,
+      details: { accountId: account.id, contactId: contact.id, opportunityId: opportunity?.id },
+    });
 
     res.json({
       success: true,
-      data: {
-        leadId,
-        score,
-        category: scoreCategory,
-        confidence,
-        factors,
-      },
+      data: { lead: { ...lead, status: "converted" }, account, contact, opportunity },
     });
-  } catch (error) {
-    // Handle ML service unavailable
-    if (error.code === "ECONNREFUSED") {
-      return res.status(503).json({
-        success: false,
-        error: "ML service unavailable. Please try again later.",
-      });
-    }
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
-/**
- * @desc    Batch score multiple leads
- * @route   POST /api/leads/score/batch
- * @access  Private
- */
-const batchScoreLeads = async (req, res, next) => {
+const deleteLead = async (req, res, next) => {
   try {
-    const { leadIds } = req.body;
-
-    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "leadIds array is required",
-      });
-    }
-
-    // Fetch leads from database
-    const { data: leads, error: fetchError } = await supabase
-      .from("leads")
-      .select("*")
-      .in("id", leadIds);
-
-    if (fetchError) throw fetchError;
-
-    // Score each lead via ML service
-    const results = await Promise.allSettled(
-      leads.map(async (lead) => {
-        const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict-score`, {
-          lead_id: lead.id,
-          email: lead.email,
-          company: lead.company,
-        }, { timeout: 10000 });
-
-        const { score, confidence, factors } = mlResponse.data;
-        let scoreCategory = "low";
-        if (score >= 70) scoreCategory = "high";
-        else if (score >= 40) scoreCategory = "medium";
-
-        // Update in database
-        await supabase
-          .from("leads")
-          .update({
-            lead_score: score,
-            score_category: scoreCategory,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", lead.id);
-
-        return { leadId: lead.id, score, category: scoreCategory, confidence, factors };
-      })
-    );
-
-    res.json({ success: true, data: results });
-  } catch (error) {
-    next(error);
-  }
+    const { id } = req.params;
+    if (req.user.role === "employee") return res.status(403).json({ success: false, error: "Access denied" });
+    const { error } = await supabase.from("leads").delete().eq("id", id);
+    if (error) throw error;
+    logActivity({ userId: req.user.id, action: "lead.deleted", entityType: "lead", entityId: id });
+    res.json({ success: true, message: "Lead deleted" });
+  } catch (error) { next(error); }
 };
 
-module.exports = {
-  getLeads,
-  getLead,
-  createLead,
-  updateLead,
-  updateLeadStatus,
-  deleteLead,
-  scoreLead,
-  batchScoreLeads,
-};
+module.exports = { getLeads, getLead, createLead, updateLead, updateLeadStatus, convertLead, deleteLead };

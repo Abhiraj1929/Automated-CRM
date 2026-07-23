@@ -1,171 +1,349 @@
 // ============================================================
-// API Client - Axios instance for backend communication
+// API Client - Business CRM API
 // ============================================================
-import axios from "axios";
-import type {
-  ApiResponse,
-  Lead,
-  Deal,
-  DashboardStats,
-  ScorePredictionRequest,
-  ScorePredictionResponse,
-} from "@/types/crm";
-
-// Create axios instance with base configuration
-const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
-  timeout: 15000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Request interceptor for auth tokens
-apiClient.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor for error handling
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error("API Error:", error.response?.data || error.message);
-    return Promise.reject(error);
-  }
-);
+import { apiClient } from "./auth";
+export { apiClient };
 
 // ============================================================
-// Lead API Methods
+// Accounts
 // ============================================================
+export async function getAccounts(params?: { industry?: string; search?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get("/accounts", { params });
+  return response.data;
+}
+export async function getAccount(id: string) {
+  const response = await apiClient.get(`/accounts/${id}`);
+  return response.data;
+}
+export async function createAccount(data: Record<string, unknown>) {
+  const response = await apiClient.post("/accounts", data);
+  return response.data;
+}
+export async function updateAccount(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/accounts/${id}`, data);
+  return response.data;
+}
+export async function deleteAccount(id: string) {
+  const response = await apiClient.delete(`/accounts/${id}`);
+  return response.data;
+}
 
-/**
- * Fetch all leads with optional filters
- */
-export async function getLeads(params?: {
-  status?: string;
-  page?: number;
-  limit?: number;
-}): Promise<ApiResponse<Lead[]>> {
+// ============================================================
+// Contacts
+// ============================================================
+export async function getContacts(params?: { account_id?: string; search?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get("/contacts", { params });
+  return response.data;
+}
+export async function getContact(id: string) {
+  const response = await apiClient.get(`/contacts/${id}`);
+  return response.data;
+}
+export async function createContact(data: Record<string, unknown>) {
+  const response = await apiClient.post("/contacts", data);
+  return response.data;
+}
+export async function updateContact(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/contacts/${id}`, data);
+  return response.data;
+}
+export async function deleteContact(id: string) {
+  const response = await apiClient.delete(`/contacts/${id}`);
+  return response.data;
+}
+
+// ============================================================
+// Leads
+// ============================================================
+export async function getLeads(params?: { status?: string; search?: string; page?: number; limit?: number }) {
   const response = await apiClient.get("/leads", { params });
   return response.data;
 }
-
-/**
- * Fetch single lead by ID
- */
-export async function getLead(id: string): Promise<ApiResponse<Lead>> {
+export async function getLead(id: string) {
   const response = await apiClient.get(`/leads/${id}`);
   return response.data;
 }
-
-/**
- * Create new lead
- */
-export async function createLead(
-  lead: Partial<Lead>
-): Promise<ApiResponse<Lead>> {
-  const response = await apiClient.post("/leads", lead);
+export async function createLead(data: Record<string, unknown>) {
+  const response = await apiClient.post("/leads", data);
   return response.data;
 }
-
-/**
- * Update lead details
- */
-export async function updateLead(
-  id: string,
-  updates: Partial<Lead>
-): Promise<ApiResponse<Lead>> {
-  const response = await apiClient.put(`/leads/${id}`, updates);
+export async function updateLead(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/leads/${id}`, data);
   return response.data;
 }
-
-/**
- * Update lead status (for Kanban drag-drop)
- */
-export async function updateLeadStatus(
-  id: string,
-  status: string
-): Promise<ApiResponse<Lead>> {
+export async function updateLeadStatus(id: string, status: string) {
   const response = await apiClient.patch(`/leads/${id}/status`, { status });
   return response.data;
 }
-
-/**
- * Delete a lead
- */
-export async function deleteLead(id: string): Promise<ApiResponse<void>> {
+export async function convertLead(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.post(`/leads/${id}/convert`, data);
+  return response.data;
+}
+export async function deleteLead(id: string) {
   const response = await apiClient.delete(`/leads/${id}`);
   return response.data;
 }
 
 // ============================================================
-// Deals API Methods
+// Opportunities
 // ============================================================
-
-/**
- * Fetch all deals for Kanban board
- */
-export async function getDeals(): Promise<ApiResponse<Deal[]>> {
-  const response = await apiClient.get("/deals");
+export async function getOpportunities(params?: { stage?: string; account_id?: string; search?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get("/opportunities", { params });
   return response.data;
 }
-
-/**
- * Update deal stage (Kanban drag-drop)
- */
-export async function updateDealStage(
-  id: string,
-  stage: string
-): Promise<ApiResponse<Deal>> {
-  const response = await apiClient.patch(`/deals/${id}/stage`, { stage });
+export async function getOpportunity(id: string) {
+  const response = await apiClient.get(`/opportunities/${id}`);
   return response.data;
 }
-
-// ============================================================
-// ML Scoring API Methods
-// ============================================================
-
-/**
- * Request AI lead score prediction
- */
-export async function predictLeadScore(
-  request: ScorePredictionRequest
-): Promise<ApiResponse<ScorePredictionResponse>> {
-  const response = await apiClient.post("/leads/score", request);
+export async function createOpportunity(data: Record<string, unknown>) {
+  const response = await apiClient.post("/opportunities", data);
   return response.data;
 }
-
-/**
- * Batch score multiple leads
- */
-export async function batchScoreLeads(
-  leadIds: string[]
-): Promise<ApiResponse<ScorePredictionResponse[]>> {
-  const response = await apiClient.post("/leads/score/batch", { leadIds });
+export async function updateOpportunity(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/opportunities/${id}`, data);
+  return response.data;
+}
+export async function updateOpportunityStage(id: string, stage: string) {
+  const response = await apiClient.patch(`/opportunities/${id}/stage`, { stage });
+  return response.data;
+}
+export async function deleteOpportunity(id: string) {
+  const response = await apiClient.delete(`/opportunities/${id}`);
+  return response.data;
+}
+export async function getPipelineStats() {
+  const response = await apiClient.get("/opportunities/stats");
   return response.data;
 }
 
 // ============================================================
-// Dashboard API Methods
+// Activities
 // ============================================================
+export async function getActivities(params?: { type?: string; status?: string; what_id?: string; what_type?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get("/activities", { params });
+  return response.data;
+}
+export async function getActivity(id: string) {
+  const response = await apiClient.get(`/activities/${id}`);
+  return response.data;
+}
+export async function createActivity(data: Record<string, unknown>) {
+  const response = await apiClient.post("/activities", data);
+  return response.data;
+}
+export async function updateActivity(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/activities/${id}`, data);
+  return response.data;
+}
+export async function deleteActivity(id: string) {
+  const response = await apiClient.delete(`/activities/${id}`);
+  return response.data;
+}
+export async function getMyTasks() {
+  const response = await apiClient.get("/activities/my-tasks");
+  return response.data;
+}
 
-/**
- * Fetch dashboard statistics
- */
-export async function getDashboardStats(): Promise<
-  ApiResponse<DashboardStats>
-> {
+// ============================================================
+// Users
+// ============================================================
+export async function getUsers(params?: { role?: string; status?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get("/users", { params });
+  return response.data;
+}
+
+// ============================================================
+// Dashboard
+// ============================================================
+export async function getDashboardStats() {
   const response = await apiClient.get("/dashboard/stats");
   return response.data;
 }
 
-export default apiClient;
+// ============================================================
+// Products
+// ============================================================
+export async function getProducts(params?: { search?: string; is_active?: string }) {
+  const response = await apiClient.get("/products", { params });
+  return response.data;
+}
+export async function getProduct(id: string) {
+  const response = await apiClient.get(`/products/${id}`);
+  return response.data;
+}
+export async function createProduct(data: Record<string, unknown>) {
+  const response = await apiClient.post("/products", data);
+  return response.data;
+}
+export async function updateProduct(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/products/${id}`, data);
+  return response.data;
+}
+export async function deleteProduct(id: string) {
+  const response = await apiClient.delete(`/products/${id}`);
+  return response.data;
+}
+export async function getProductStats() {
+  const response = await apiClient.get("/products/stats");
+  return response.data;
+}
+
+// ============================================================
+// Campaigns
+// ============================================================
+export async function getCampaigns(params?: { status?: string; search?: string }) {
+  const response = await apiClient.get("/campaigns", { params });
+  return response.data;
+}
+export async function getCampaign(id: string) {
+  const response = await apiClient.get(`/campaigns/${id}`);
+  return response.data;
+}
+export async function createCampaign(data: Record<string, unknown>) {
+  const response = await apiClient.post("/campaigns", data);
+  return response.data;
+}
+export async function updateCampaign(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/campaigns/${id}`, data);
+  return response.data;
+}
+export async function deleteCampaign(id: string) {
+  const response = await apiClient.delete(`/campaigns/${id}`);
+  return response.data;
+}
+
+// ============================================================
+// Automation
+// ============================================================
+export async function getAuditLogs(params?: { entity_type?: string; entity_id?: string; user_id?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get("/automation/audit-logs", { params });
+  return response.data;
+}
+export async function getWorkflowRules(params?: { entity_type?: string }) {
+  const response = await apiClient.get("/automation/workflows", { params });
+  return response.data;
+}
+export async function createWorkflowRule(data: Record<string, unknown>) {
+  const response = await apiClient.post("/automation/workflows", data);
+  return response.data;
+}
+export async function updateWorkflowRule(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/automation/workflows/${id}`, data);
+  return response.data;
+}
+export async function deleteWorkflowRule(id: string) {
+  const response = await apiClient.delete(`/automation/workflows/${id}`);
+  return response.data;
+}
+export async function getWorkflowLogs(params?: { rule_id?: string; entity_type?: string }) {
+  const response = await apiClient.get("/automation/workflows/logs", { params });
+  return response.data;
+}
+export async function getScoringRules() {
+  const response = await apiClient.get("/automation/scoring-rules");
+  return response.data;
+}
+export async function createScoringRule(data: Record<string, unknown>) {
+  const response = await apiClient.post("/automation/scoring-rules", data);
+  return response.data;
+}
+export async function updateScoringRule(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/automation/scoring-rules/${id}`, data);
+  return response.data;
+}
+export async function deleteScoringRule(id: string) {
+  const response = await apiClient.delete(`/automation/scoring-rules/${id}`);
+  return response.data;
+}
+export async function rescoreAllLeads() {
+  const response = await apiClient.post("/automation/scoring-rules/rescore");
+  return response.data;
+}
+export async function getEscalationRules() {
+  const response = await apiClient.get("/automation/escalation-rules");
+  return response.data;
+}
+export async function createEscalationRule(data: Record<string, unknown>) {
+  const response = await apiClient.post("/automation/escalation-rules", data);
+  return response.data;
+}
+export async function updateEscalationRule(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/automation/escalation-rules/${id}`, data);
+  return response.data;
+}
+export async function deleteEscalationRule(id: string) {
+  const response = await apiClient.delete(`/automation/escalation-rules/${id}`);
+  return response.data;
+}
+export async function runEscalationsNow() {
+  const response = await apiClient.post("/automation/escalation-rules/run");
+  return response.data;
+}
+export async function getEmailTemplates(params?: { category?: string }) {
+  const response = await apiClient.get("/automation/email-templates", { params });
+  return response.data;
+}
+export async function createEmailTemplate(data: Record<string, unknown>) {
+  const response = await apiClient.post("/automation/email-templates", data);
+  return response.data;
+}
+export async function updateEmailTemplate(id: string, data: Record<string, unknown>) {
+  const response = await apiClient.put(`/automation/email-templates/${id}`, data);
+  return response.data;
+}
+export async function deleteEmailTemplate(id: string) {
+  const response = await apiClient.delete(`/automation/email-templates/${id}`);
+  return response.data;
+}
+export async function sendEmail(data: Record<string, unknown>) {
+  const response = await apiClient.post("/automation/emails/send", data);
+  return response.data;
+}
+export async function getEmailLogs(params?: { entity_type?: string; entity_id?: string }) {
+  const response = await apiClient.get("/automation/emails/logs", { params });
+  return response.data;
+}
+export async function checkDuplicates(data: { entity_type: string; email?: string; first_name?: string; last_name?: string; company?: string; account_id?: string; name?: string }) {
+  const response = await apiClient.post("/automation/check-duplicates", data);
+  return response.data;
+}
+export async function uploadAttachment(file: File, entityType: string, entityId: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("entity_type", entityType);
+  formData.append("entity_id", entityId);
+  const response = await apiClient.post("/automation/attachments/upload", formData, { headers: { "Content-Type": "multipart/form-data" } });
+  return response.data;
+}
+export async function getAttachments(entityType: string, entityId: string) {
+  const response = await apiClient.get("/automation/attachments", { params: { entity_type: entityType, entity_id: entityId } });
+  return response.data;
+}
+export async function deleteAttachment(id: string) {
+  const response = await apiClient.delete(`/automation/attachments/${id}`);
+  return response.data;
+}
+export async function getNotifications(params?: { unread_only?: string }) {
+  const response = await apiClient.get("/automation/notifications", { params });
+  return response.data;
+}
+export async function getUnreadCount() {
+  const response = await apiClient.get("/automation/notifications/unread-count");
+  return response.data;
+}
+export async function markNotificationRead(id: string) {
+  const response = await apiClient.put(`/automation/notifications/${id}/read`);
+  return response.data;
+}
+export async function markAllNotificationsRead() {
+  const response = await apiClient.put("/automation/notifications/read-all");
+  return response.data;
+}
+export async function getScheduledJobs() {
+  const response = await apiClient.get("/automation/scheduled-jobs");
+  return response.data;
+}
+export async function runScheduledJobsNow() {
+  const response = await apiClient.post("/automation/scheduled-jobs/run");
+  return response.data;
+}

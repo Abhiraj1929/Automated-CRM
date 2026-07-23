@@ -1,0 +1,42 @@
+// ============================================================
+// User Routes - Admin user management
+// ============================================================
+const express = require("express");
+const router = express.Router();
+const {
+  getUsers,
+  getUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  resetPassword,
+  getManagerEmployees,
+} = require("../controllers/userController");
+const { authenticate, authorize } = require("../middleware/auth");
+const { validateUser } = require("../middleware/validate");
+
+// All routes require authentication
+router.use(authenticate);
+
+// GET /api/users - Get all users (Admin: all, Manager: team)
+router.get("/", authorize("admin", "manager"), getUsers);
+
+// GET /api/users/:id - Get single user
+router.get("/:id", getUser);
+
+// POST /api/users - Create user (Admin only)
+router.post("/", authorize("admin"), validateUser, createUser);
+
+// PUT /api/users/:id - Update user
+router.put("/:id", updateUser);
+
+// DELETE /api/users/:id - Delete user (Admin only)
+router.delete("/:id", authorize("admin"), deleteUser);
+
+// PATCH /api/users/:id/reset-password - Reset password (Admin only)
+router.patch("/:id/reset-password", authorize("admin"), resetPassword);
+
+// GET /api/users/:id/employees - Get manager's employees
+router.get("/:id/employees", authorize("admin", "manager"), getManagerEmployees);
+
+module.exports = router;

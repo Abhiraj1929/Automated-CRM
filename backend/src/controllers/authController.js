@@ -1,0 +1,318 @@
+// ============================================================
+// Auth Controller - Login, Register, Logout, Session Management
+// ============================================================
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const { supabase } = require("../config/supabase");
+const { JWT_SECRET } = require("../middleware/auth");
+const { logActivity } = require("../middleware/activityLogger");
+
+const TOKEN_EXPIRY = "7d";
+const REFRESH_TOKEN_EXPIRY = "30d";
+
+/**
+ * Generate JWT token
+ */
+const generateToken = (userId, role) => {
+  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+};
+
+/**
+ * Generate refresh token
+ */
+const generateRefreshToken = (userId) => {
+  return jwt.sign({ userId, type: "refresh" }, JWT_SECRET, {
+    expiresIn: REFRESH_TOKEN_EXPIRY,
+  });
+};
+
+/**
+ * @desc    Login user
+ * @route   POST /api/auth/login
+ * @access  Public
+ */
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (error || !user) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid email or password",
+      });
+    }
+
+    // Check if user is active
+    if (user.status !== "active") {
+      return res.status(403).json({
+        success: false,
+        error: "Account is deactivated. Contact administrator.",
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid email or password",
+      });
+    }
+
+    // Generate tokens
+    const token = generateToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id);
+
+    // Update last login
+    await supabase
+      .from("users")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+
+    // Log activity
+    logActivity({
+      userId: user.id,
+      action: "auth.login",
+      entityType: "user",
+      entityId: user.id,
+    });
+
+    // Set secure cookie
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    };
+
+    res.cookie("token", token, cookieOptions);
+    res.cookie("refreshToken", refreshToken, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
+    // Return user info (without password)
+    const { password_hash, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      data: {
+        user: userWithoutPassword,
+        token,
+        refreshToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Register new user (Admin only)
+ * @route   POST /api/auth/register
+ * @access  Private (Admin)
+ */
+const register = async (req, res, next) => {
+  try {
+    const { name, email, password, role, manager_id, phone, department, designation } = req.body;
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: "User with this email already exists",
+      });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(12);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    // Create user
+    const { data: user, error } = await supabase
+      .from("users")
+      .insert({
+        name,
+        email,
+        password_hash,
+        role: role || "employee",
+        manager_id: manager_id || null,
+        phone: phone || null,
+        department: department || null,
+        designation: designation || null,
+        status: "active",
+      })
+      .select("id, name, email, role, manager_id, phone, department, designation, status, created_at")
+      .single();
+
+    if (error) throw error;
+
+    // Log activity
+    logActivity({
+      userId: req.user?.id || user.id,
+      action: "user.created",
+      entityType: "user",
+      entityId: user.id,
+      details: { role: user.role, email: user.email },
+    });
+
+    res.status(201).json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get current user profile
+ * @route   GET /api/auth/me
+ * @access  Private
+ */
+const getMe = async (req, res, next) => {
+  try {
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, name, email, role, manager_id, phone, department, designation, status, profile_image, created_at, updated_at")
+      .eq("id", req.user.id)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // If user has a manager_id, fetch manager info
+    let manager = null;
+    if (user.manager_id) {
+      const { data: managerData } = await supabase
+        .from("users")
+        .select("id, name, email")
+        .eq("id", user.manager_id)
+        .single();
+      manager = managerData;
+    }
+
+    res.json({
+      success: true,
+      data: { ...user, manager },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Logout user (clear cookies)
+ * @route   POST /api/auth/logout
+ * @access  Private
+ */
+const logout = async (req, res, next) => {
+  try {
+    // Log activity
+    logActivity({
+      userId: req.user.id,
+      action: "auth.logout",
+      entityType: "user",
+      entityId: req.user.id,
+    });
+
+    // Clear cookies
+    res.cookie("token", "", { maxAge: 0, path: "/" });
+    res.cookie("refreshToken", "", { maxAge: 0, path: "/" });
+
+    res.json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Refresh token
+ * @route   POST /api/auth/refresh
+ * @access  Public (with refresh token)
+ */
+const refreshToken = async (req, res, next) => {
+  try {
+    const token = req.cookies?.refreshToken || req.body?.refreshToken;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: "Refresh token required",
+      });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (decoded.type !== "refresh") {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid refresh token",
+      });
+    }
+
+    // Verify user still exists and is active
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, role, status")
+      .eq("id", decoded.userId)
+      .single();
+
+    if (!user || user.status !== "active") {
+      return res.status(401).json({
+        success: false,
+        error: "User not found or deactivated",
+      });
+    }
+
+    // Generate new tokens
+    const newToken = generateToken(user.id, user.role);
+    const newRefreshToken = generateRefreshToken(user.id);
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    };
+
+    res.cookie("token", newToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.cookie("refreshToken", newRefreshToken, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      success: true,
+      data: { token: newToken, refreshToken: newRefreshToken },
+    });
+  } catch (error) {
+    if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid refresh token. Please log in again.",
+      });
+    }
+    next(error);
+  }
+};
+
+module.exports = { login, register, getMe, logout, refreshToken };
