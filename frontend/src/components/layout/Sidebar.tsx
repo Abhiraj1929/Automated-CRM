@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Building2, Users, UserCheck, TrendingUp, Settings, ChevronLeft, Sparkles, LogOut, Briefcase, CheckSquare, Package, Megaphone, BarChart3, Zap,
+  LayoutDashboard, Building2, Users, UserCheck, TrendingUp, Settings, ChevronLeft, LogOut, Briefcase, CheckSquare, Package, Megaphone, BarChart3, Zap, Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     { href: "/campaigns", label: "Campaigns", icon: Megaphone },
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/automation", label: "Automation", icon: Zap },
+    ...(isAdmin ? [{ href: "/audit-logs", label: "Audit Logs", icon: Shield }] : []),
     ...(isAdmin ? [{ href: "/admin/users", label: "Users", icon: Briefcase }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
@@ -46,9 +47,9 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
         {!collapsed && (
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
-              <Sparkles className="w-4 h-4 text-white" />
+              <Briefcase className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-base tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Sales CRM</span>
+            <span className="font-bold text-base tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>CRM</span>
           </div>
         )}
         <Button variant="ghost" size="icon" onClick={onToggle} className="h-7 w-7" style={{ color: "hsl(220, 9%, 46%)" }}>

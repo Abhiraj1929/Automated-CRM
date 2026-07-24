@@ -3,14 +3,17 @@
 // ============================================================
 const express = require("express");
 const router = express.Router();
-const { login, register, getMe, logout, refreshToken } = require("../controllers/authController");
+const { login, register, signup, getMe, logout, refreshToken } = require("../controllers/authController");
 const { authenticate, authorize } = require("../middleware/auth");
 const { validateLogin, validateRegister } = require("../middleware/validate");
 
 // POST /api/auth/login - Login
 router.post("/login", validateLogin, login);
 
-// POST /api/auth/register - Register (Admin only)
+// POST /api/auth/signup - Public self-serve registration (creates org + admin)
+router.post("/signup", signup);
+
+// POST /api/auth/register - Register (Admin only, within existing org)
 router.post("/register", authenticate, authorize("admin"), validateRegister, register);
 
 // GET /api/auth/me - Get current user

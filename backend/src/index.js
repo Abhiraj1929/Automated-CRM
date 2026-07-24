@@ -3,6 +3,7 @@
 // ============================================================
 require("dotenv").config();
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
@@ -21,6 +22,16 @@ const productRoutes = require("./routes/products");
 const campaignRoutes = require("./routes/campaigns");
 const automationRoutes = require("./routes/automation");
 const dashboardRoutes = require("./routes/dashboard");
+const importExportRoutes = require("./routes/importExport");
+const reportRoutes = require("./routes/reports");
+const billingRoutes = require("./routes/billing");
+const webhookRoutes = require("./routes/webhooks");
+const stripeService = require("./services/stripeService");
+
+// Import services
+const emailService = require("./services/emailService");
+const storageService = require("./services/storageService");
+const websocketService = require("./services/websocketService");
 
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
@@ -28,7 +39,15 @@ const { setupSwagger } = require("./config/swagger");
 
 // Initialize Express app
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// ============================================================
+// Initialize Services
+// ============================================================
+emailService.init();
+storageService.init();
+websocketService.init(server);
 
 // ============================================================
 // Security Middleware
@@ -44,12 +63,20 @@ app.use(cors({
 }));
 
 // ============================================================
+// Stripe Webhooks — MUST be before express.json() for raw body
+// ============================================================
+app.use("/api/webhooks", webhookRoutes);
+
+// ============================================================
 // Body Parsing & Logging
 // ============================================================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.use(requestLogger);
+
+// Serve uploaded files (local storage fallback)
+app.use("/uploads", express.static("uploads"));
 
 // ============================================================
 // Rate Limiting
@@ -77,6 +104,9 @@ app.use("/api/products", productRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/automation", automationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/data", importExportRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/billing", billingRoutes);
 
 // Health check (no rate limit)
 app.get("/api/health", (req, res) => {
@@ -88,6 +118,12 @@ app.get("/api/health", (req, res) => {
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || "development",
       memory: process.memoryUsage(),
+      services: {
+        email: emailService.initialized ? "configured" : "logging-only",
+        storage: storageService.useS3 ? "s3" : "local",
+        websocket: "active",
+        billing: stripeService.isConfigured() ? "stripe" : "self-serve",
+      },
     },
   });
 });
@@ -111,15 +147,18 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // ============================================================
-// Graceful Shutdown
+// Start Server (using http.createServer for WebSocket support)
 // ============================================================
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   logger.info(`AI CRM Backend running on port ${PORT}`, {
     environment: process.env.NODE_ENV || "development",
     pid: process.pid,
   });
 });
 
+// ============================================================
+// Graceful Shutdown
+// ============================================================
 const gracefulShutdown = (signal) => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
   server.close(() => {

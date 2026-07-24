@@ -26,12 +26,15 @@ class LeadScorer:
         self.scaler = None
         self.label_encoder_industry = None
         self.label_encoder_source = None
+        self.label_encoder_status = None
+        self.label_encoder_rating = None
         self.is_loaded = False
-        self.model_version = "2.0.0"
+        self.model_version = "3.0.0"
         self.feature_names = [
             "company_size", "industry_encoded", "source_encoded",
-            "page_views", "time_on_site", "email_opened",
-            "form_submitted", "demo_requested", "is_business_email",
+            "status_encoded", "rating_encoded",
+            "activity_count", "completed_activities", "overdue_activities",
+            "has_opportunity", "opp_value", "is_business_email",
         ]
         self.known_industries = [
             "technology", "finance", "healthcare", "manufacturing",
@@ -41,6 +44,10 @@ class LeadScorer:
             "website", "referral", "social_media", "email_campaign",
             "paid_ads", "event", "organic",
         ]
+        self.known_statuses = [
+            "new", "contacted", "qualified", "converted", "unqualified",
+        ]
+        self.known_ratings = ["hot", "warm", "cold"]
 
     def load_model(self, model_path: Optional[str] = None):
         if model_path is None:
@@ -52,7 +59,9 @@ class LeadScorer:
                 self.scaler = model_data.get("scaler")
                 self.label_encoder_industry = model_data.get("label_encoder_industry")
                 self.label_encoder_source = model_data.get("label_encoder_source")
-                self.model_version = model_data.get("model_version", "2.0.0")
+                self.label_encoder_status = model_data.get("label_encoder_status")
+                self.label_encoder_rating = model_data.get("label_encoder_rating")
+                self.model_version = model_data.get("model_version", "3.0.0")
                 self.is_loaded = True
                 logger.info(f"Model loaded v{self.model_version} from {model_path}")
             else:
@@ -78,15 +87,32 @@ class LeadScorer:
                 pass
         return self.known_sources.index(source.lower()) if source and source.lower() in self.known_sources else 6
 
+    def _encode_status(self, status: Optional[str]) -> int:
+        if self.label_encoder_status and status:
+            try:
+                return int(self.label_encoder_status.transform([status.lower()])[0])
+            except ValueError:
+                pass
+        return self.known_statuses.index(status.lower()) if status and status.lower() in self.known_statuses else 0
+
+    def _encode_rating(self, rating: Optional[str]) -> int:
+        if self.label_encoder_rating and rating:
+            try:
+                return int(self.label_encoder_rating.transform([rating.lower()])[0])
+            except ValueError:
+                pass
+        return self.known_ratings.index(rating.lower()) if rating and rating.lower() in self.known_ratings else 2
+
     def _extract_features(
         self, email, company, industry, company_size, lead_source,
         page_views, time_on_site, email_opened, form_submitted, demo_requested,
+        status=None, rating=None, activity_count=0, completed_activities=0,
+        overdue_activities=0, has_opportunity=0, opp_value=0,
     ) -> np.ndarray:
         industry_enc = self._encode_industry(industry)
         source_enc = self._encode_source(lead_source)
-        email_engagement = 1.0 if email_opened else 0.0
-        form_sub = 1.0 if form_submitted else 0.0
-        demo_req = 1.0 if demo_requested else 0.0
+        status_enc = self._encode_status(status)
+        rating_enc = self._encode_rating(rating)
 
         is_business_email = 1.0
         if email:
@@ -95,18 +121,23 @@ class LeadScorer:
             if domain in personal:
                 is_business_email = 0.0
 
+        cs = float(company_size or 50)
         pv = float(page_views or 0)
         tos = float(time_on_site or 0)
-        cs = float(company_size or 50)
+        eo = 1.0 if email_opened else 0.0
+        fs = 1.0 if form_submitted else 0.0
+        dr = 1.0 if demo_requested else 0.0
 
-        engagement_score = pv * 0.4 + tos * 0.008 + email_engagement * 5 + form_sub * 8 + demo_req * 12
-        intent_score = form_sub * 10 + demo_req * 18 + email_engagement * 3
+        # Engagement features
+        engagement_score = pv * 0.4 + tos * 0.008 + eo * 5 + fs * 8 + dr * 12
+        intent_score = fs * 10 + dr * 18 + eo * 3
         company_engagement = np.log1p(cs) * pv * 0.01
 
         features = np.array([
             cs, float(industry_enc), float(source_enc),
-            pv, tos, email_engagement, form_sub, demo_req,
-            is_business_email, engagement_score, intent_score, company_engagement,
+            float(status_enc), float(rating_enc),
+            float(activity_count), float(completed_activities), float(overdue_activities),
+            float(has_opportunity), float(opp_value), is_business_email,
         ]).reshape(1, -1)
         return features
 
@@ -183,6 +214,8 @@ class LeadScorer:
         self, email, company=None, industry=None, company_size=None,
         lead_source=None, page_views=None, time_on_site=None,
         email_opened=None, form_submitted=None, demo_requested=None,
+        status=None, rating=None, activity_count=0, completed_activities=0,
+        overdue_activities=0, has_opportunity=0, opp_value=0,
     ) -> Dict[str, Any]:
         if self.model is not None:
             try:
@@ -190,6 +223,8 @@ class LeadScorer:
                     email, company, industry, company_size,
                     lead_source, page_views, time_on_site,
                     email_opened, form_submitted, demo_requested,
+                    status, rating, activity_count, completed_activities,
+                    overdue_activities, has_opportunity, opp_value,
                 )
                 if self.scaler:
                     features = self.scaler.transform(features)

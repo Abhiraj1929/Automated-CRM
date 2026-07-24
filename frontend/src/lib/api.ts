@@ -347,3 +347,49 @@ export async function runScheduledJobsNow() {
   const response = await apiClient.post("/automation/scheduled-jobs/run");
   return response.data;
 }
+
+// ============================================================
+// Import/Export
+// ============================================================
+export async function exportData(entity: string, format: string = 'csv') {
+  const response = await apiClient.get(`/data/export/${entity}`, {
+    params: { format },
+    responseType: 'blob',
+  });
+  return response;
+}
+
+export async function importData(entity: string, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post(`/data/import/${entity}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+// ============================================================
+// Reports
+// ============================================================
+export async function getReport(type: string, format: string = 'csv', params: Record<string, string> = {}) {
+  const response = await apiClient.get(`/reports/${type}`, {
+    params: { format, ...params },
+    responseType: 'blob',
+  });
+  return response;
+}
+
+export async function getScheduledReports() {
+  const response = await apiClient.get('/reports/scheduled');
+  return response.data;
+}
+
+export async function createScheduledReport(data: Record<string, unknown>) {
+  const response = await apiClient.post('/reports/scheduled', data);
+  return response.data;
+}
+
+export async function deleteScheduledReport(id: string) {
+  const response = await apiClient.delete(`/reports/scheduled/${id}`);
+  return response.data;
+}

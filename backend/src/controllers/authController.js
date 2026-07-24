@@ -315,4 +315,96 @@ const refreshToken = async (req, res, next) => {
   }
 };
 
-module.exports = { login, register, getMe, logout, refreshToken };
+/**
+ * @desc    Public self-serve signup (creates organization + admin user)
+ * @route   POST /api/auth/signup
+ * @access  Public
+ */
+const signup = async (req, res, next) => {
+  try {
+    const { name, email, password, role, organization_id } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Name, email, and password are required",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 6 characters",
+      });
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: "An account with this email already exists",
+      });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(12);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    // Create user as admin of their organization
+    const { data: user, error } = await supabase
+      .from("users")
+      .insert({
+        name,
+        email,
+        password_hash,
+        role: role || "admin",
+        organization_id: organization_id || null,
+        status: "active",
+      })
+      .select("id, name, email, role, organization_id, status, created_at")
+      .single();
+
+    if (error) throw error;
+
+    // Generate tokens and set cookies
+    const token = generateToken(user.id, user.role);
+    const refreshTokenVal = generateRefreshToken(user.id);
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+    };
+
+    res.cookie("token", token, cookieOptions);
+    res.cookie("refreshToken", refreshTokenVal, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    logActivity({
+      userId: user.id,
+      action: "user.signup",
+      entityType: "user",
+      entityId: user.id,
+      details: { role: user.role, email: user.email, organization_id },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { user, token, refreshToken: refreshTokenVal },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { login, register, signup, getMe, logout, refreshToken };

@@ -59,6 +59,13 @@ class LeadScoreRequest(BaseModel):
     email_opened: Optional[bool] = None
     form_submitted: Optional[bool] = None
     demo_requested: Optional[bool] = None
+    status: Optional[str] = None
+    rating: Optional[str] = None
+    activity_count: Optional[int] = 0
+    completed_activities: Optional[int] = 0
+    overdue_activities: Optional[int] = 0
+    has_opportunity: Optional[int] = 0
+    opp_value: Optional[float] = 0
 
 
 class ScoreFactor(BaseModel):
@@ -140,6 +147,13 @@ async def predict_score(request: LeadScoreRequest):
             email_opened=request.email_opened,
             form_submitted=request.form_submitted,
             demo_requested=request.demo_requested,
+            status=request.status,
+            rating=request.rating,
+            activity_count=request.activity_count,
+            completed_activities=request.completed_activities,
+            overdue_activities=request.overdue_activities,
+            has_opportunity=request.has_opportunity,
+            opp_value=request.opp_value,
         )
         
         # Category comes directly from the model

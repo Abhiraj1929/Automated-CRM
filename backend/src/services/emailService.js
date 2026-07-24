@@ -1,112 +1,182 @@
-const { supabase } = require("../config/supabase");
+const nodemailer = require('nodemailer');
+const { supabase } = require('../config/supabase');
 
-// Replace template variables like {{first_name}}, {{account.name}}
-const renderTemplate = (template, entity) => {
-  let rendered = template;
-  for (const [key, value] of Object.entries(entity)) {
-    if (typeof value === "string" || typeof value === "number") {
-      rendered = rendered.replace(new RegExp(`{{\\s*${key}\\s*}}`, "gi"), String(value));
+class EmailService {
+  constructor() {
+    this.transporter = null;
+    this.initialized = false;
+  }
+
+  init() {
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT || '587');
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const from = process.env.SMTP_FROM || user;
+
+    if (!host || !user || !pass) {
+      console.warn('⚠️  SMTP not configured — emails will be logged but not sent');
+      this.from = from || 'noreply@crm.com';
+      return;
     }
-    if (typeof value === "object" && value !== null) {
-      for (const [k2, v2] of Object.entries(value)) {
-        if (typeof v2 === "string" || typeof v2 === "number") {
-          rendered = rendered.replace(new RegExp(`{{\\s*${key}.${k2}\\s*}}`, "gi"), String(v2));
+
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false },
+    });
+
+    this.from = from;
+    this.initialized = true;
+    console.log(`✅ Email service initialized (SMTP: ${host}:${port})`);
+  }
+
+  async sendEmail({ to, subject, html, text, from, attachments }) {
+    const sender = from || this.from;
+
+    // Always log to database
+    const { data: log } = await supabase
+      .from('email_logs')
+      .insert({
+        sender_id: null,
+        recipient: Array.isArray(to) ? to.join(', ') : to,
+        subject,
+        body: text || html,
+        template_id: null,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    // Actually send if configured
+    if (this.initialized && this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: sender,
+          to: Array.isArray(to) ? to.join(', ') : to,
+          subject,
+          html,
+          text,
+          attachments,
+        });
+
+        if (log) {
+          await supabase
+            .from('email_logs')
+            .update({ status: 'sent' })
+            .eq('id', log.id);
         }
+
+        console.log(`📧 Email sent to ${to}: ${subject}`);
+        return { success: true, logId: log?.id };
+      } catch (err) {
+        console.error(`❌ Email send failed: ${err.message}`);
+        if (log) {
+          await supabase
+            .from('email_logs')
+            .update({ status: 'failed' })
+            .eq('id', log.id);
+        }
+        return { success: false, error: err.message, logId: log?.id };
       }
     }
+
+    // No SMTP — just log
+    if (log) {
+      await supabase
+        .from('email_logs')
+        .update({ status: 'sent' })
+        .eq('id', log.id);
+    }
+    return { success: true, logId: log?.id, note: 'Email logged (SMTP not configured)' };
   }
-  return rendered;
-};
 
-// Send email (log it - in production would integrate with SMTP/SendGrid)
-const sendEmail = async ({ fromUserId, toEmail, subject, body, templateId, entityType, entityId }) => {
-  try {
-    const { data, error } = await supabase.from("email_logs").insert({
-      from_user_id: fromUserId, to_email: toEmail, subject, body,
-      template_id: templateId || null, to_entity_type: entityType || null,
-      to_entity_id: entityId || null, status: "sent",
-    }).select().single();
-    if (error) throw error;
-    return { success: true, data };
-  } catch (err) { return { success: false, error: err.message }; }
-};
+  renderTemplate(template, variables = {}) {
+    let rendered = template.body || template.content || '';
+    const vars = { ...template.defaults, ...variables };
 
-// Send templated email
-const sendTemplatedEmail = async ({ templateId, toEmail, entityType, entityId, fromUserId, additionalVars = {} }) => {
-  try {
-    const { data: template } = await supabase.from("email_templates").select("*").eq("id", templateId).single();
-    if (!template) return { success: false, error: "Template not found" };
-
-    let entity = additionalVars;
-    if (entityType && entityId) {
-      const tableMap = { lead: "leads", contact: "contacts", account: "accounts", opportunity: "opportunities" };
-      const table = tableMap[entityType];
-      if (table) { const { data } = await supabase.from(table).select("*").eq("id", entityId).single(); if (data) entity = { ...data, ...additionalVars }; }
+    for (const [key, value] of Object.entries(vars)) {
+      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+      rendered = rendered.replace(regex, value != null ? String(value) : '');
     }
 
-    const subject = renderTemplate(template.subject, entity);
-    const body = renderTemplate(template.body, entity);
-    return await sendEmail({ fromUserId, toEmail, subject, body, templateId, entityType, entityId });
-  } catch (err) { return { success: false, error: err.message }; }
-};
+    return {
+      subject: (template.subject || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => vars[k] || ''),
+      html: rendered,
+      text: rendered.replace(/<[^>]*>/g, ''),
+    };
+  }
 
-// CRUD
-const getEmailTemplates = async (req, res, next) => {
-  try {
-    const { category } = req.query;
-    let query = supabase.from("email_templates").select("*").order("created_at", { ascending: false });
-    if (category) query = query.eq("category", category);
-    const { data, error } = await query;
-    if (error) throw error;
-    res.json({ success: true, data });
-  } catch (error) { next(error); }
-};
+  async sendTemplatedEmail({ templateId, to, variables = {}, senderId }) {
+    const { data: template } = await supabase
+      .from('email_templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
 
-const createEmailTemplate = async (req, res, next) => {
-  try {
-    const { data, error } = await supabase.from("email_templates").insert({ ...req.body, created_by: req.user.id }).select().single();
-    if (error) throw error;
-    res.status(201).json({ success: true, data });
-  } catch (error) { next(error); }
-};
+    if (!template) return { success: false, error: 'Template not found' };
 
-const updateEmailTemplate = async (req, res, next) => {
-  try {
-    const { data, error } = await supabase.from("email_templates").update({ ...req.body, updated_at: new Date().toISOString() }).eq("id", req.params.id).select().single();
-    if (error) throw error;
-    res.json({ success: true, data });
-  } catch (error) { next(error); }
-};
+    const rendered = this.renderTemplate(template, variables);
 
-const deleteEmailTemplate = async (req, res, next) => {
-  try { await supabase.from("email_templates").delete().eq("id", req.params.id); res.json({ success: true }); }
-  catch (error) { next(error); }
-};
+    return this.sendEmail({
+      to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      from: this.from,
+    });
+  }
 
-const sendEmailHandler = async (req, res, next) => {
-  try {
-    const { template_id, to_email, entity_type, entity_id } = req.body;
-    if (template_id) {
-      const result = await sendTemplatedEmail({ templateId: template_id, toEmail: to_email, entityType: entity_type, entityId: entity_id, fromUserId: req.user.id });
-      return res.json(result);
-    }
-    const { subject, body } = req.body;
-    const result = await sendEmail({ fromUserId: req.user.id, toEmail: to_email, subject, body, entityType: entity_type, entityId: entity_id });
-    res.json(result);
-  } catch (error) { next(error); }
-};
+  async getTemplates() {
+    const { data, error } = await supabase
+      .from('email_templates')
+      .select('*')
+      .order('created_at', { ascending: false });
+    return { data: data || [], error };
+  }
 
-const getEmailLogs = async (req, res, next) => {
-  try {
-    const { entity_type, entity_id, page = 1, limit = 50 } = req.query;
-    let query = supabase.from("email_logs").select("*, from_user:users!email_logs_from_user_id_fkey(name, email)", { count: "exact" });
-    if (entity_type) query = query.eq("to_entity_type", entity_type);
-    if (entity_id) query = query.eq("to_entity_id", entity_id);
-    query = query.order("sent_at", { ascending: false }).range((page - 1) * limit, page * limit - 1);
-    const { data, error, count } = await query;
-    if (error) throw error;
-    res.json({ success: true, data, pagination: { page: +page, limit: +limit, total: count || 0 } });
-  } catch (error) { next(error); }
-};
+  async createTemplate(template) {
+    const { data, error } = await supabase
+      .from('email_templates')
+      .insert(template)
+      .select()
+      .single();
+    return { data, error };
+  }
 
-module.exports = { sendEmail, sendTemplatedEmail, getEmailTemplates, createEmailTemplate, updateEmailTemplate, deleteEmailTemplate, sendEmailHandler, getEmailLogs };
+  async updateTemplate(id, updates) {
+    const { data, error } = await supabase
+      .from('email_templates')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    return { data, error };
+  }
+
+  async deleteTemplate(id) {
+    const { error } = await supabase
+      .from('email_templates')
+      .delete()
+      .eq('id', id);
+    return { error };
+  }
+
+  async getLogs({ page = 1, limit = 20, recipient } = {}) {
+    let query = supabase
+      .from('email_logs')
+      .select('*, sender:users(name, email)', { count: 'exact' });
+
+    if (recipient) query = query.ilike('recipient', `%${recipient}%`);
+
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
+
+    const { data, count, error } = await query;
+    return { data: data || [], total: count || 0, page, limit, error };
+  }
+}
+
+module.exports = new EmailService();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,10 +11,43 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getLeads, createLead, convertLead } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Lead } from "@/types/crm";
-import { Plus, Search, Loader2, X, ArrowRightLeft } from "lucide-react";
+import { Plus, Search, Loader2, X, ArrowRightLeft, Download, Upload } from "lucide-react";
+
+const exportLeads = async (format: string) => {
+  const token = document.cookie.split(';').find(c => c.trim().startsWith('token='))?.split('=')[1];
+  const res = await fetch(`http://localhost:5000/api/data/export/leads?format=${format}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `leads_export.${format}`;
+  a.click();
+};
+
+const importLeads = async (file: File) => {
+  const token = document.cookie.split(';').find(c => c.trim().startsWith('token='))?.split('=')[1];
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch('http://localhost:5000/api/data/import/leads', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  return res.json();
+};
+
+interface ImportResult {
+  imported?: number;
+  skipped?: number;
+  errors?: string[];
+  success?: boolean;
+  message?: string;
+}
 
 export default function LeadsPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -23,6 +56,8 @@ export default function LeadsPage() {
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", company: "", title: "", industry: "", source: "" });
   const [convertForm, setConvertForm] = useState({ opportunity_name: "", opportunity_amount: "", opportunity_close_date: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const fetchData = useCallback(async () => {
     try { const r = await getLeads({ limit: 100, search: search || undefined }); if (r.success && r.data) setLeads(r.data); } catch {} finally { setLoading(false); }
@@ -39,6 +74,27 @@ export default function LeadsPage() {
     try { const r = await convertLead(showConvert, { opportunity_name: convertForm.opportunity_name || undefined, opportunity_amount: convertForm.opportunity_amount ? +convertForm.opportunity_amount : undefined, opportunity_close_date: convertForm.opportunity_close_date || undefined }); if (r.success) { setLeads((p) => p.map((l) => l.id === showConvert ? { ...l, status: "converted" } : l)); setShowConvert(null); setConvertForm({ opportunity_name: "", opportunity_amount: "", opportunity_close_date: "" }); } } catch {} finally { setSubmitting(false); }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const result = await importLeads(file);
+      setImportResult(result);
+      fetchData();
+    } catch {
+      setImportResult({ success: false, message: "Import failed. Please try again.", errors: ["Network or server error"] });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleExport = async () => {
+    try { await exportLeads("csv"); } catch {}
+  };
+
   const getInitials = (f: string, l: string) => `${f?.[0] || ""}${l?.[0] || ""}`.toUpperCase() || "??";
   const getRatingColor = (r: string) => { switch (r) { case "hot": return "bg-red-100 text-red-700"; case "warm": return "bg-amber-100 text-amber-700"; default: return "bg-blue-100 text-blue-700"; } };
 
@@ -48,8 +104,40 @@ export default function LeadsPage() {
       <div className="flex-1 p-6 space-y-6 overflow-auto">
         <div className="flex items-center justify-between">
           <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input type="search" placeholder="Search leads..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-80 rounded-md border bg-background pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="h-4 w-4 mr-2" />Add Lead</Button>
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImport} />
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="h-4 w-4 mr-2" />Add Lead</Button>
+          </div>
         </div>
+
+        {importResult && (
+          <div className={`rounded-md border p-4 text-sm ${importResult.success !== false ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                {importResult.imported !== undefined && <span className="font-medium">Imported: {importResult.imported}</span>}
+                {importResult.skipped !== undefined && <span className="ml-4">Skipped: {importResult.skipped}</span>}
+                {importResult.message && <span className="ml-4">{importResult.message}</span>}
+              </div>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setImportResult(null)}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            {importResult.errors && importResult.errors.length > 0 && (
+              <ul className="mt-2 list-disc list-inside text-xs space-y-0.5">
+                {importResult.errors.map((err, i) => <li key={i}>{err}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+
         <Card><CardContent className="p-0">
           {loading ? <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
             <Table><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Company</TableHead><TableHead>Rating</TableHead><TableHead>Status</TableHead><TableHead>Score</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>

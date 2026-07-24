@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,16 +10,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getAccounts, createAccount } from "@/lib/api";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Account } from "@/types/crm";
-import { Plus, Search, Loader2, X, Building2 } from "lucide-react";
+import { Plus, Search, Loader2, X, Building2, Download, Upload } from "lucide-react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export default function AccountsPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", industry: "", website: "", phone: "", email: "", city: "", state: "", country: "", annual_revenue: "", number_of_employees: "", description: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const fetchData = useCallback(async () => {
     try { const r = await getAccounts({ limit: 100, search: search || undefined }); if (r.success && r.data) setAccounts(r.data); } catch {} finally { setLoading(false); }
@@ -31,13 +36,67 @@ export default function AccountsPage() {
     try { const r = await createAccount({ ...form, annual_revenue: form.annual_revenue ? +form.annual_revenue : null, number_of_employees: form.number_of_employees ? +form.number_of_employees : null }); if (r.success && r.data) { setAccounts((p) => [r.data, ...p]); setShowAdd(false); setForm({ name: "", industry: "", website: "", phone: "", email: "", city: "", state: "", country: "", annual_revenue: "", number_of_employees: "", description: "" }); } } catch {} finally { setSubmitting(false); }
   };
 
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setExporting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/data/export/accounts?format=${format}`);
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `accounts.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      console.error("Export error:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE}/api/data/import/accounts`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Import failed");
+      await fetchData();
+    } catch (err) {
+      console.error("Import error:", err);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <Header title="Accounts" subtitle="Manage your companies" />
       <div className="flex-1 p-6 space-y-6 overflow-auto">
         <div className="flex items-center justify-between">
           <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input type="search" placeholder="Search accounts..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-80 rounded-md border bg-background pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring" /></div>
-          <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="h-4 w-4 mr-2" />Add Account</Button>
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImport} />
+            <Button size="sm" variant="outline" disabled={exporting || importing} onClick={() => handleExport("csv")}>
+              {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Export CSV
+            </Button>
+            <Button size="sm" variant="outline" disabled={exporting || importing} onClick={() => handleExport("xlsx")}>
+              {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Export XLSX
+            </Button>
+            <Button size="sm" variant="outline" disabled={exporting || importing} onClick={() => fileInputRef.current?.click()}>
+              {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Import
+            </Button>
+            <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="h-4 w-4 mr-2" />Add Account</Button>
+          </div>
         </div>
         <Card><CardContent className="p-0">
           {loading ? <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (

@@ -42,7 +42,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-center w-10 h-10 rounded-xl" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-2xl tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Sales CRM</span>
+          <span className="font-bold text-2xl tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>CRM</span>
         </div>
 
         {/* Login Card */}
@@ -107,15 +107,9 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-6 p-3.5 rounded-lg text-sm" style={{ backgroundColor: "hsl(220, 14%, 98%)", border: "1px solid hsl(220, 13%, 94%)" }}>
-            <p className="font-medium mb-1.5" style={{ color: "hsl(220, 13%, 18%)" }}>Demo Credentials</p>
-            <div className="space-y-0.5">
-              <p style={{ color: "hsl(220, 9%, 46%)" }}>Admin: <span className="font-medium" style={{ color: "hsl(220, 13%, 18%)" }}>admin@crm.com</span> / Admin123!</p>
-              <p style={{ color: "hsl(220, 9%, 46%)" }}>Manager: <span className="font-medium" style={{ color: "hsl(220, 13%, 18%)" }}>sarah@company.com</span> / Manager123!</p>
-              <p style={{ color: "hsl(220, 9%, 46%)" }}>Employee: <span className="font-medium" style={{ color: "hsl(220, 13%, 18%)" }}>marcus@company.com</span> / Employee123!</p>
-            </div>
-          </div>
+          <p className="text-center text-sm mt-4" style={{ color: "hsl(220, 9%, 46%)" }}>
+            Contact your administrator for login credentials
+          </p>
         </div>
       </div>
     </div>
