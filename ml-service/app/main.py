@@ -72,7 +72,7 @@ class LeadScoreResponse(BaseModel):
     """Response model for lead scoring prediction"""
     lead_id: str
     score: int  # 0-100
-    category: str  # "high", "medium", "low"
+    category: str  # "high", "moderate", "low"
     confidence: float  # 0-1
     factors: List[ScoreFactor]
     model_version: str
@@ -142,14 +142,9 @@ async def predict_score(request: LeadScoreRequest):
             demo_requested=request.demo_requested,
         )
         
-        # Determine category based on score
+        # Category comes directly from the model
         score = prediction["score"]
-        if score >= 70:
-            category = "high"
-        elif score >= 40:
-            category = "medium"
-        else:
-            category = "low"
+        category = prediction.get("category", "low")
         
         return LeadScoreResponse(
             lead_id=request.lead_id,
@@ -187,7 +182,7 @@ async def predict_score_batch(request: BatchScoreRequest):
             )
             
             score = prediction["score"]
-            category = "high" if score >= 70 else "medium" if score >= 40 else "low"
+            category = prediction.get("category", "low")
             
             results.append(LeadScoreResponse(
                 lead_id=lead.lead_id,
@@ -217,11 +212,11 @@ async def get_model_info():
     """Get information about the current model"""
     return {
         "model_version": lead_scorer.model_version,
-        "model_type": "RandomForestClassifier",
+        "model_type": "GradientBoostingClassifier",
         "features_used": lead_scorer.feature_names,
         "is_loaded": lead_scorer.is_loaded,
-        "training_date": "2024-01-15",
-        "accuracy": 0.87,
+        "categories": ["high", "moderate", "low"],
+        "accuracy": "see training logs",
     }
 
 
