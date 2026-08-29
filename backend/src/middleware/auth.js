@@ -1,5 +1,5 @@
 // ============================================================
-// Auth Middleware - JWT Verification & Role Authorization
+// Auth Middleware - JWT Verification, Role Authorization & RLS
 // ============================================================
 const jwt = require("jsonwebtoken");
 const { supabase } = require("../config/supabase");
@@ -8,7 +8,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-i
 
 /**
  * Middleware: Verify JWT token from cookie or Authorization header
- * Attaches req.user with { id, email, role }
+ * Attaches req.user with { id, email, role, organization_id }
+ * Sets PostgreSQL session variables for RLS enforcement.
  */
 const authenticate = async (req, res, next) => {
   try {
@@ -30,7 +31,7 @@ const authenticate = async (req, res, next) => {
     // Fetch user from database to verify still exists and get current role
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, name, email, role, status, manager_id")
+      .select("id, name, email, role, status, manager_id, is_super_admin, organization_id")
       .eq("id", decoded.userId)
       .single();
 
@@ -48,6 +49,18 @@ const authenticate = async (req, res, next) => {
       });
     }
 
+    // Check token blacklist (Redis) if available
+    const { isTokenBlacklisted } = require("../config/redis");
+    if (isTokenBlacklisted) {
+      const blacklisted = await isTokenBlacklisted(token);
+      if (blacklisted) {
+        return res.status(401).json({
+          success: false,
+          error: "Session revoked. Please log in again.",
+        });
+      }
+    }
+
     // Attach user to request
     req.user = {
       id: user.id,
@@ -55,7 +68,32 @@ const authenticate = async (req, res, next) => {
       email: user.email,
       role: user.role,
       managerId: user.manager_id,
+      is_super_admin: user.is_super_admin || false,
+      organization_id: user.organization_id || null,
     };
+
+    // Set PostgreSQL session variables for RLS enforcement
+    // Uses Supabase RPC to set session variables within the current transaction
+    if (user.organization_id) {
+      try {
+        await supabase.rpc("set_config", {
+          setting_name: "app.current_organization_id",
+          setting_value: user.organization_id,
+          is_local: true,
+        });
+      } catch {
+        // RPC may not exist yet — fall through to direct query approach
+      }
+      try {
+        await supabase.rpc("set_config", {
+          setting_name: "app.current_user_id",
+          setting_value: user.id,
+          is_local: true,
+        });
+      } catch {
+        // Fall through
+      }
+    }
 
     next();
   } catch (error) {

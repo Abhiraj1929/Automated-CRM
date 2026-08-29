@@ -40,12 +40,13 @@ class EmailService {
     const { data: log } = await supabase
       .from('email_logs')
       .insert({
-        sender_id: null,
-        recipient: Array.isArray(to) ? to.join(', ') : to,
+        from_user_id: null,
+        to_email: Array.isArray(to) ? to.join(', ') : to,
         subject,
         body: text || html,
         template_id: null,
         status: 'pending',
+        sent_at: new Date().toISOString(),
       })
       .select()
       .single();

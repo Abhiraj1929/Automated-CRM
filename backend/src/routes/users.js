@@ -18,6 +18,30 @@ const { validateUser } = require("../middleware/validate");
 // All routes require authentication
 router.use(authenticate);
 
+// PUT /api/users/me - Update own profile
+router.put("/me", async (req, res) => {
+  try {
+    const { supabase } = require("../config/supabase");
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    delete updates.id;
+    delete updates.role;
+    delete updates.organization_id;
+    delete updates.created_at;
+
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", req.user.id)
+      .select("id, name, email, role, onboarding_completed, organization_id")
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/users - Get all users (Admin: all, Manager: team)
 router.get("/", authorize("admin", "manager"), getUsers);
 

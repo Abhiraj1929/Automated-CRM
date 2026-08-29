@@ -1,11 +1,8 @@
-// ============================================================
-// ProtectedRoute - Route guard with role-based access
-// ============================================================
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,18 +12,22 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const redirected = useRef(false);
 
   useEffect(() => {
     if (loading) return;
+    if (redirected.current) return;
 
     if (!user) {
+      redirected.current = true;
       router.push("/login");
       return;
     }
 
     if (requiredRoles && !requiredRoles.includes(user.role)) {
-      // Redirect to appropriate dashboard based on role
-      router.push(getDashboardPath(user.role));
+      redirected.current = true;
+      router.push("/dashboard");
+      return;
     }
   }, [user, loading, router, requiredRoles]);
 
@@ -47,9 +48,6 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   return <>{children}</>;
 }
 
-/**
- * Get dashboard path based on user role
- */
 export function getDashboardPath(role: string): string {
   switch (role) {
     case "admin":

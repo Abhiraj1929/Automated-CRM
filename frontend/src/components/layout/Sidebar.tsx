@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Building2, Users, UserCheck, TrendingUp, Settings, ChevronLeft, LogOut, Briefcase, CheckSquare, Package, Megaphone, BarChart3, Zap, Shield,
+  LayoutDashboard, Building2, Users, UserCheck, TrendingUp, Settings, ChevronLeft, LogOut, Briefcase, CheckSquare, Package, Megaphone, BarChart3, Zap,
+  LayoutList, PieChart, Activity, Database, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,8 +32,12 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     { href: "/campaigns", label: "Campaigns", icon: Megaphone },
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/automation", label: "Automation", icon: Zap },
-    ...(isAdmin ? [{ href: "/audit-logs", label: "Audit Logs", icon: Shield }] : []),
+    { href: "/data-sources", label: "Data Sources", icon: Database },
+    ...(isAdmin ? [{ href: "/integrations", label: "Integrations", icon: Link2 }] : []),
     ...(isAdmin ? [{ href: "/admin/users", label: "Users", icon: Briefcase }] : []),
+    ...(isAdmin ? [{ href: "/admin/organizations", label: "Organizations", icon: LayoutList }] : []),
+    ...(isAdmin ? [{ href: "/admin/analytics", label: "Analytics", icon: PieChart }] : []),
+    ...(isAdmin ? [{ href: "/admin/activity", label: "Activity Feed", icon: Activity }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

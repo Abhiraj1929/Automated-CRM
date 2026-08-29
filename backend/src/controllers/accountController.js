@@ -3,6 +3,7 @@
 // ============================================================
 const { supabase } = require("../config/supabase");
 const { logActivity } = require("../middleware/activityLogger");
+const { runWorkflow } = require("../services/workflowEngine");
 
 /**
  * Get all accounts with RBAC
@@ -105,6 +106,7 @@ const createAccount = async (req, res, next) => {
     if (error) throw error;
 
     logActivity({ userId: req.user.id, action: "account.created", entityType: "account", entityId: data.id, details: { name } });
+    runWorkflow("account", "on_create", data, null, req.user.organization_id).catch(() => {});
     res.status(201).json({ success: true, data });
   } catch (error) { next(error); }
 };

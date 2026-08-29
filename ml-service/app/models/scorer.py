@@ -1,205 +1,232 @@
-# ============================================================
-# Lead Scorer - ML Model for Lead Quality Prediction
-# ============================================================
-# Uses a trained GradientBoosting model for 3-class prediction:
-#   high (60-100), moderate (35-59), low (0-34)
-# Falls back to rule-based scoring if no model is available.
-# ============================================================
+"""
+Lead Scorer — Multi-tenant scoring engine that loads vertical-specific models
+and dynamically routes predictions based on vertical_type parameter.
 
-import numpy as np
+v5.0 — Non-blocking: all CPU-bound work runs via asyncio.to_thread.
+Atomic model hot-swap: new models replace old ones without prediction interruption.
+"""
 import os
+import asyncio
+import threading
+import numpy as np
 import joblib
-import logging
-from typing import Optional, Dict, List, Any
-from pathlib import Path
+from typing import Dict, List, Any, Optional, Tuple
 
-logger = logging.getLogger(__name__)
+from .vertical_config import (
+    get_vertical_config, get_feature_names, get_feature_count,
+    SUPPORTED_VERTICALS, VerticalConfig,
+)
+from .feature_engineering import (
+    extract_features_from_lead, build_feature_matrix,
+    VerticalLabelEncoders, is_business_email,
+)
+
+
+# ============================================================
+# Multi-Tenant Model Registry — Thread-safe
+# ============================================================
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "artifacts")
+FALLBACK_MODEL = os.path.join(os.path.dirname(__file__), "trained_model.joblib")
 
 
 class LeadScorer:
     """
-    Lead scoring engine that predicts lead quality as high/moderate/low (0-100).
+    Multi-tenant lead scoring engine.
+    Loads per-vertical models from trained_model_{vertical}.joblib.
+    Falls back to rule-based scoring if no model is available.
+
+    Thread-safe: model dict is replaced atomically via copy-on-write.
     """
 
     def __init__(self):
-        self.model = None
-        self.scaler = None
-        self.label_encoder_industry = None
-        self.label_encoder_source = None
-        self.label_encoder_status = None
-        self.label_encoder_rating = None
-        self.is_loaded = False
-        self.model_version = "3.0.0"
-        self.feature_names = [
-            "company_size", "industry_encoded", "source_encoded",
-            "status_encoded", "rating_encoded",
-            "activity_count", "completed_activities", "overdue_activities",
-            "has_opportunity", "opp_value", "is_business_email",
-        ]
-        self.known_industries = [
-            "technology", "finance", "healthcare", "manufacturing",
-            "retail", "education", "other",
-        ]
-        self.known_sources = [
-            "website", "referral", "social_media", "email_campaign",
-            "paid_ads", "event", "organic",
-        ]
-        self.known_statuses = [
-            "new", "contacted", "qualified", "converted", "unqualified",
-        ]
-        self.known_ratings = ["hot", "warm", "cold"]
+        self._models: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()  # Protects model dict mutations
+        self.default_vertical = "b2b"
+        self._loaded = False
 
-    def load_model(self, model_path: Optional[str] = None):
-        if model_path is None:
-            model_path = Path(__file__).parent / "trained_model.joblib"
+    @property
+    def models(self) -> Dict[str, Dict[str, Any]]:
+        return self._models
+
+    def load_all_models(self) -> Dict[str, bool]:
+        """Load all available vertical models. Returns load status per vertical."""
+        results = {}
+        for vertical in SUPPORTED_VERTICALS:
+            results[vertical] = self.load_model(vertical)
+        self._loaded = any(results.values())
+        return results
+
+    def load_model(self, vertical_type: str) -> bool:
+        """Load a specific vertical's model from disk (atomic swap)."""
+        model_path = os.path.join(MODEL_DIR, f"trained_model_{vertical_type}.joblib")
+
+        if not os.path.exists(model_path) and vertical_type == "b2b" and os.path.exists(FALLBACK_MODEL):
+            model_path = FALLBACK_MODEL
+
+        if not os.path.exists(model_path):
+            return False
+
         try:
-            if os.path.exists(model_path):
-                model_data = joblib.load(model_path)
-                self.model = model_data["model"]
-                self.scaler = model_data.get("scaler")
-                self.label_encoder_industry = model_data.get("label_encoder_industry")
-                self.label_encoder_source = model_data.get("label_encoder_source")
-                self.label_encoder_status = model_data.get("label_encoder_status")
-                self.label_encoder_rating = model_data.get("label_encoder_rating")
-                self.model_version = model_data.get("model_version", "3.0.0")
-                self.is_loaded = True
-                logger.info(f"Model loaded v{self.model_version} from {model_path}")
-            else:
-                logger.warning(f"No model at {model_path}, using rule-based fallback")
-                self.is_loaded = True
+            artifact = joblib.load(model_path)
+            # Atomic swap — replace the entire vertical entry
+            with self._lock:
+                new_models = dict(self._models)
+                new_models[vertical_type] = artifact
+                self._models = new_models
+            return True
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
-            self.is_loaded = True
+            print(f"Failed to load model for {vertical_type}: {e}")
+            return False
 
-    def _encode_industry(self, industry: Optional[str]) -> int:
-        if self.label_encoder_industry and industry:
-            try:
-                return int(self.label_encoder_industry.transform([industry.lower()])[0])
-            except ValueError:
-                pass
-        return self.known_industries.index(industry.lower()) if industry and industry.lower() in self.known_industries else 6
+    def hot_swap_model(self, vertical_type: str, artifact: Dict[str, Any]) -> None:
+        """Hot-swap a model in-memory without reloading from disk."""
+        with self._lock:
+            new_models = dict(self._models)
+            new_models[vertical_type] = artifact
+            self._models = new_models
+        print(f"[SCORER] Hot-swapped model for {vertical_type}")
 
-    def _encode_source(self, source: Optional[str]) -> int:
-        if self.label_encoder_source and source:
-            try:
-                return int(self.label_encoder_source.transform([source.lower()])[0])
-            except ValueError:
-                pass
-        return self.known_sources.index(source.lower()) if source and source.lower() in self.known_sources else 6
+    def is_loaded(self, vertical_type: Optional[str] = None) -> bool:
+        if vertical_type:
+            return vertical_type in self._models
+        return self._loaded
 
-    def _encode_status(self, status: Optional[str]) -> int:
-        if self.label_encoder_status and status:
-            try:
-                return int(self.label_encoder_status.transform([status.lower()])[0])
-            except ValueError:
-                pass
-        return self.known_statuses.index(status.lower()) if status and status.lower() in self.known_statuses else 0
+    def get_model_info(self, vertical_type: Optional[str] = None) -> Dict[str, Any]:
+        if vertical_type:
+            artifact = self._models.get(vertical_type)
+            if not artifact:
+                return {"loaded": False, "vertical_type": vertical_type}
+            return {
+                "loaded": True,
+                "vertical_type": artifact.get("vertical_type", vertical_type),
+                "model_version": artifact.get("model_version", "unknown"),
+                "trained_on_real_data": artifact.get("trained_on_real_data", False),
+                "training_accuracy": artifact.get("training_accuracy", 0),
+                "cv_accuracy": artifact.get("cv_accuracy", 0),
+                "feature_names": artifact.get("feature_names", []),
+                "n_features": len(artifact.get("feature_names", [])),
+                "n_training_samples": artifact.get("n_training_samples", 0),
+                "trained_at": artifact.get("trained_at", "unknown"),
+            }
 
-    def _encode_rating(self, rating: Optional[str]) -> int:
-        if self.label_encoder_rating and rating:
-            try:
-                return int(self.label_encoder_rating.transform([rating.lower()])[0])
-            except ValueError:
-                pass
-        return self.known_ratings.index(rating.lower()) if rating and rating.lower() in self.known_ratings else 2
+        return {
+            "loaded_models": list(self._models.keys()),
+            "available_verticals": SUPPORTED_VERTICALS,
+            "models": {v: self.get_model_info(v) for v in self._models},
+        }
 
-    def _extract_features(
-        self, email, company, industry, company_size, lead_source,
-        page_views, time_on_site, email_opened, form_submitted, demo_requested,
-        status=None, rating=None, activity_count=0, completed_activities=0,
-        overdue_activities=0, has_opportunity=0, opp_value=0,
-    ) -> np.ndarray:
-        industry_enc = self._encode_industry(industry)
-        source_enc = self._encode_source(lead_source)
-        status_enc = self._encode_status(status)
-        rating_enc = self._encode_rating(rating)
-
-        is_business_email = 1.0
-        if email:
-            domain = email.split("@")[-1].lower()
-            personal = {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "aol.com", "live.com"}
-            if domain in personal:
-                is_business_email = 0.0
-
-        cs = float(company_size or 50)
-        pv = float(page_views or 0)
-        tos = float(time_on_site or 0)
-        eo = 1.0 if email_opened else 0.0
-        fs = 1.0 if form_submitted else 0.0
-        dr = 1.0 if demo_requested else 0.0
-
-        # Engagement features
-        engagement_score = pv * 0.4 + tos * 0.008 + eo * 5 + fs * 8 + dr * 12
-        intent_score = fs * 10 + dr * 18 + eo * 3
-        company_engagement = np.log1p(cs) * pv * 0.01
-
-        features = np.array([
-            cs, float(industry_enc), float(source_enc),
-            float(status_enc), float(rating_enc),
-            float(activity_count), float(completed_activities), float(overdue_activities),
-            float(has_opportunity), float(opp_value), is_business_email,
-        ]).reshape(1, -1)
-        return features
-
-    def _rule_based_score(
-        self, email, company, industry, company_size, lead_source,
-        page_views, time_on_site, email_opened, form_submitted, demo_requested,
+    # ============================================================
+    # Prediction — Non-blocking (asyncio.to_thread)
+    # ============================================================
+    async def predict_async(
+        self,
+        lead_data: Dict[str, Any],
+        vertical_type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        score = 25
-        factors = []
+        """Non-blocking prediction — runs CPU-bound work in thread pool."""
+        return await asyncio.to_thread(self.predict, lead_data, vertical_type)
 
-        if company_size:
-            if company_size > 1000:
-                score += 15; factors.append({"feature": "company_size", "impact": 15, "description": f"Enterprise ({company_size} employees)"})
-            elif company_size > 100:
-                score += 10; factors.append({"feature": "company_size", "impact": 10, "description": f"Mid-market ({company_size} employees)"})
-            elif company_size > 10:
-                score += 5; factors.append({"feature": "company_size", "impact": 5, "description": f"Small business ({company_size} employees)"})
+    async def predict_batch_async(
+        self,
+        leads: List[Dict[str, Any]],
+        vertical_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Non-blocking batch prediction with chunked parallel execution."""
+        # Chunk leads into groups of 50 for parallel processing
+        chunk_size = 50
+        chunks = [leads[i:i + chunk_size] for i in range(0, len(leads), chunk_size)]
 
-        high_ind = {"technology", "finance", "healthcare"}
-        if industry and industry.lower() in high_ind:
-            score += 12; factors.append({"feature": "industry", "impact": 12, "description": f"High-value industry: {industry}"})
+        all_results = []
+        for chunk in chunks:
+            # Process each chunk in parallel via thread pool
+            tasks = [
+                asyncio.to_thread(self.predict, lead, vertical_type)
+                for lead in chunk
+            ]
+            chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in chunk_results:
+                if isinstance(result, Exception):
+                    # Fallback: rule-based score on error
+                    all_results.append(self._rule_based_score(
+                        leads[len(all_results)], vertical_type or "b2b"
+                    ))
+                else:
+                    all_results.append(result)
 
-        if lead_source:
-            src = lead_source.lower()
-            if src in {"referral", "event"}:
-                score += 14; factors.append({"feature": "lead_source", "impact": 14, "description": f"High-quality source: {lead_source}"})
-            elif src == "organic":
-                score += 10; factors.append({"feature": "lead_source", "impact": 10, "description": "Organic inbound"})
-            elif src == "website":
-                score += 6; factors.append({"feature": "lead_source", "impact": 6, "description": "Website inbound"})
+        return all_results
 
-        if page_views and page_views > 10:
-            score += 8; factors.append({"feature": "page_views", "impact": 8, "description": f"High engagement: {page_views} page views"})
-        elif page_views and page_views > 5:
-            score += 4; factors.append({"feature": "page_views", "impact": 4, "description": f"Moderate engagement: {page_views} page views"})
+    def predict(
+        self,
+        lead_data: Dict[str, Any],
+        vertical_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Synchronous prediction (used by predict_async)."""
+        if not vertical_type:
+            vertical_type = self._detect_vertical(lead_data)
 
-        if time_on_site and time_on_site > 300:
-            score += 7; factors.append({"feature": "time_on_site", "impact": 7, "description": f"Extended session: {time_on_site/60:.1f} min"})
+        # Snapshot the current model dict (safe even during hot-swap)
+        models_snapshot = self._models
 
-        if email_opened:
-            score += 6; factors.append({"feature": "email_engagement", "impact": 6, "description": "Email opened"})
-        if form_submitted:
-            score += 12; factors.append({"feature": "form_submitted", "impact": 12, "description": "Form submitted - strong intent"})
-        if demo_requested:
-            score += 18; factors.append({"feature": "demo_requested", "impact": 18, "description": "Demo requested - very high intent"})
+        if vertical_type in models_snapshot:
+            try:
+                return self._predict_with_model(lead_data, vertical_type, models_snapshot[vertical_type])
+            except Exception:
+                pass
 
-        if email:
-            domain = email.split("@")[-1].lower()
-            personal = {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com"}
-            if domain not in personal:
-                score += 5; factors.append({"feature": "email_domain", "impact": 5, "description": f"Business email: {domain}"})
+        return self._rule_based_score(lead_data, vertical_type)
 
-        score = max(0, min(100, score))
+    def predict_batch(
+        self,
+        leads: List[Dict[str, Any]],
+        vertical_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Synchronous batch prediction."""
+        return [self.predict(lead, vertical_type=vertical_type) for lead in leads]
 
-        data_points = sum([
-            1 if company_size else 0, 1 if industry else 0, 1 if lead_source else 0,
-            1 if page_views else 0, 1 if time_on_site else 0,
-            1 if email_opened is not None else 0,
-            1 if form_submitted is not None else 0,
-            1 if demo_requested is not None else 0,
-        ])
-        confidence = min(0.5 + (data_points * 0.0625), 0.95)
+    # ============================================================
+    # Internal: ML Prediction
+    # ============================================================
+    def _predict_with_model(
+        self,
+        lead_data: Dict[str, Any],
+        vertical_type: str,
+        artifact: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Score a lead using the ML model for a specific vertical."""
+        model = artifact["model"]
+        scaler = artifact["scaler"]
+        feature_names = artifact.get("feature_names", get_feature_names(vertical_type))
+        encoders = artifact.get("encoders")
+        model_version = artifact.get("model_version", "unknown")
+
+        feature_df, _ = build_feature_matrix(
+            [lead_data], vertical_type, encoders=encoders, fit_encoders=False
+        )
+
+        for fname in feature_names:
+            if fname not in feature_df.columns:
+                feature_df[fname] = 0.0
+        feature_df = feature_df[feature_names]
+
+        X = feature_df.values.astype(float)
+        X_scaled = scaler.transform(X)
+
+        prediction = model.predict(X_scaled)[0]
+        probas = model.predict_proba(X_scaled)[0]
+
+        pred_label = str(prediction)
+        max_proba = float(np.max(probas))
+
+        score_map = {"high": 80, "moderate": 55, "low": 20}
+        base_score = score_map.get(pred_label, 50)
+
+        confidence = max_proba
+        if confidence > 0.8:
+            score = min(100, base_score + 15)
+        elif confidence > 0.6:
+            score = base_score + 5
+        else:
+            score = max(0, base_score - 10)
 
         if score >= 65:
             category = "high"
@@ -208,61 +235,136 @@ class LeadScorer:
         else:
             category = "low"
 
-        return {"score": score, "category": category, "confidence": round(confidence, 2), "factors": factors}
+        importances = model.feature_importances_
+        factors = []
+        for fname, imp in sorted(zip(feature_names, importances), key=lambda x: -x[1]):
+            value = lead_data.get(fname, 0)
+            factors.append({
+                "feature": fname,
+                "importance": round(float(imp), 4),
+                "value": value,
+                "impact": "positive" if float(value) > 0 else "neutral",
+            })
 
-    def predict(
-        self, email, company=None, industry=None, company_size=None,
-        lead_source=None, page_views=None, time_on_site=None,
-        email_opened=None, form_submitted=None, demo_requested=None,
-        status=None, rating=None, activity_count=0, completed_activities=0,
-        overdue_activities=0, has_opportunity=0, opp_value=0,
-    ) -> Dict[str, Any]:
-        if self.model is not None:
-            try:
-                features = self._extract_features(
-                    email, company, industry, company_size,
-                    lead_source, page_views, time_on_site,
-                    email_opened, form_submitted, demo_requested,
-                    status, rating, activity_count, completed_activities,
-                    overdue_activities, has_opportunity, opp_value,
-                )
-                if self.scaler:
-                    features = self.scaler.transform(features)
+        return {
+            "score": round(score, 1),
+            "category": category,
+            "confidence": round(confidence, 3),
+            "factors": factors[:5],
+            "model_version": model_version,
+            "vertical_type": vertical_type,
+            "method": "ml_model",
+        }
 
-                prediction = self.model.predict(features)[0]
-                proba = self.model.predict_proba(features)[0]
-                classes = list(self.model.classes_)
-                confidence = float(max(proba))
+    # ============================================================
+    # Internal: Rule-Based Fallback
+    # ============================================================
+    def _rule_based_score(self, lead_data: Dict[str, Any], vertical_type: str) -> Dict[str, Any]:
+        score = 25.0
+        factors = []
+        signals = self._extract_signals(lead_data, vertical_type)
+        for signal_name, weight, value in signals:
+            if value:
+                score += weight
+                factors.append({
+                    "feature": signal_name,
+                    "importance": round(weight / 50.0, 4),
+                    "value": value,
+                    "impact": "positive",
+                })
 
-                # Map to 0-100 score from probability
-                cat_idx = classes.index(prediction) if prediction in classes else 0
-                if prediction == "high":
-                    score = int(65 + proba[cat_idx] * 35)
-                elif prediction == "moderate":
-                    score = int(40 + proba[cat_idx] * 25)
-                else:
-                    score = int(proba[cat_idx] * 40)
+        score = max(0, min(100, score))
+        if score >= 65:
+            category = "high"
+        elif score >= 40:
+            category = "moderate"
+        else:
+            category = "low"
 
-                score = max(0, min(100, score))
+        filled_fields = sum(1 for _, _, v in signals if v)
+        confidence = min(0.95, 0.3 + (filled_fields / len(signals)) * 0.6)
 
-                # Build factors from feature importances
-                factors = []
-                if hasattr(self.model, "feature_importances_"):
-                    importances = self.model.feature_importances_
-                    for name, imp in sorted(zip(self.feature_names, importances), key=lambda x: -x[1])[:5]:
-                        factors.append({
-                            "feature": name,
-                            "impact": round(float(imp * 100), 2),
-                            "description": f"Model feature: {name}",
-                        })
+        return {
+            "score": round(score, 1),
+            "category": category,
+            "confidence": round(confidence, 3),
+            "factors": sorted(factors, key=lambda x: -x["importance"])[:5],
+            "model_version": f"rules-{vertical_type}",
+            "vertical_type": vertical_type,
+            "method": "rule_based",
+        }
 
-                return {"score": score, "category": prediction, "confidence": round(confidence, 2), "factors": factors}
+    def _extract_signals(self, lead_data: Dict[str, Any], vertical_type: str) -> List[Tuple[str, float, Any]]:
+        signals = []
 
-            except Exception as e:
-                logger.warning(f"ML prediction failed, using rule-based: {e}")
+        if vertical_type == "b2b":
+            cs = lead_data.get("company_size", 0)
+            signals.append(("company_size", 20 if cs > 5000 else 10 if cs > 100 else 5, cs))
+            signals.append(("is_business_email", 12, lead_data.get("is_business_email", False)))
+            signals.append(("has_opportunity", 18, lead_data.get("has_opportunity", False)))
+            ov = lead_data.get("opp_value", 0)
+            signals.append(("opp_value", 15 if ov > 50000 else 8 if ov > 10000 else 3, ov))
+            signals.append(("demo_requested", 10, lead_data.get("demo_requested", False)))
+            signals.append(("form_submitted", 8, lead_data.get("form_submitted", False)))
+            ts = lead_data.get("time_on_site", 0)
+            signals.append(("time_on_site", 8 if ts > 300 else 4 if ts > 120 else 1, ts))
+            pv = lead_data.get("page_views", 0)
+            signals.append(("page_views", 6 if pv > 10 else 3 if pv > 5 else 1, pv))
+            signals.append(("activity_count", 5 if lead_data.get("activity_count", 0) > 5 else 2, lead_data.get("activity_count", 0)))
 
-        return self._rule_based_score(
-            email, company, industry, company_size,
-            lead_source, page_views, time_on_site,
-            email_opened, form_submitted, demo_requested,
-        )
+        elif vertical_type == "real_estate":
+            budget = lead_data.get("budget", 0)
+            signals.append(("budget", 20 if budget > 500000 else 12 if budget > 200000 else 5, budget))
+            signals.append(("pre_approved_mortgage", 18, lead_data.get("pre_approved_mortgage", False)))
+            tours = lead_data.get("scheduled_tours", 0)
+            signals.append(("scheduled_tours", 15 if tours > 2 else 8 if tours > 0 else 0, tours))
+            views = lead_data.get("property_views", 0)
+            signals.append(("property_views", 10 if views > 30 else 5 if views > 10 else 2, views))
+            lm = lead_data.get("location_match_score", 0)
+            signals.append(("location_match_score", 8 if lm > 0.7 else 4 if lm > 0.4 else 1, lm))
+            signals.append(("engagement_score", 5, lead_data.get("engagement_score", 0)))
+
+        elif vertical_type == "ecommerce":
+            cv = lead_data.get("cart_value", 0)
+            signals.append(("cart_value", 18 if cv > 100 else 10 if cv > 30 else 3, cv))
+            orders = lead_data.get("past_orders_count", 0)
+            signals.append(("past_orders_count", 15 if orders > 5 else 8 if orders > 0 else 2, orders))
+            signals.append(("loyalty_member", 12, lead_data.get("loyalty_member", False)))
+            signals.append(("cart_abandoned", -8, lead_data.get("cart_abandoned", False)))
+            signals.append(("is_business_email", 5, lead_data.get("is_business_email", False)))
+            iv = lead_data.get("items_viewed", 0)
+            signals.append(("items_viewed", 5 if iv > 20 else 2 if iv > 5 else 0, iv))
+
+        elif vertical_type == "services":
+            budget = lead_data.get("project_budget", 0)
+            signals.append(("project_budget", 18 if budget > 100000 else 10 if budget > 30000 else 4, budget))
+            signals.append(("consultation_requested", 18, lead_data.get("consultation_requested", False)))
+            urgency = str(lead_data.get("timeline_urgency", "")).lower()
+            signals.append(("timeline_urgency", 12 if urgency in ("immediate", "within_month") else 5 if urgency == "within_quarter" else 1, urgency))
+            signals.append(("engagement_score", 8 if lead_data.get("engagement_score", 0) > 70 else 3, lead_data.get("engagement_score", 0)))
+            signals.append(("activity_count", 5 if lead_data.get("activity_count", 0) > 5 else 2, lead_data.get("activity_count", 0)))
+            signals.append(("is_business_email", 5, lead_data.get("is_business_email", False)))
+
+        return signals
+
+    def _detect_vertical(self, lead_data: Dict[str, Any]) -> str:
+        if any(k in lead_data for k in ("budget", "pre_approved_mortgage", "scheduled_tours", "property_views")):
+            return "real_estate"
+        if any(k in lead_data for k in ("cart_value", "past_orders_count", "loyalty_member", "items_in_cart")):
+            return "ecommerce"
+        if any(k in lead_data for k in ("project_budget", "timeline_urgency", "consultation_requested", "service_type")):
+            return "services"
+        return self.default_vertical
+
+
+# ============================================================
+# Singleton
+# ============================================================
+_scorer_instance: Optional[LeadScorer] = None
+
+
+def get_scorer() -> LeadScorer:
+    global _scorer_instance
+    if _scorer_instance is None:
+        _scorer_instance = LeadScorer()
+    return _scorer_instance

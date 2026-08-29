@@ -6,26 +6,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getContacts, createContact, getAccounts } from "@/lib/api";
+import { getContacts, createContact, getAccounts, exportData, importData } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Contact, Account } from "@/types/crm";
 import { Plus, Search, Loader2, X, Mail, Phone, Building2, Download, Upload, FileUp } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-
-const downloadFile = async (url: string, filename: string) => {
-  const token = document.cookie
-    .split(";")
-    .find((c) => c.trim().startsWith("token="))
-    ?.split("=")[1];
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const blob = await res.blob();
+const handleExportContacts = async (format: string) => {
+  const response = await exportData("contacts", format);
+  const blob = new Blob([response.data]);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = filename;
+  a.download = `contacts.${format}`;
   a.click();
+};
+
+const handleImportContacts = async (file: File) => {
+  return await importData("contacts", file);
 };
 
 export default function ContactsPage() {
@@ -55,7 +51,7 @@ export default function ContactsPage() {
   const handleExport = async (format: string) => {
     setExporting(format);
     try {
-      await downloadFile(`${API_BASE}/api/data/export/contacts?format=${format}`, `contacts.${format}`);
+      await handleExportContacts(format);
     } catch (err) {
       console.error("Export failed:", err);
     } finally {
@@ -67,22 +63,10 @@ export default function ContactsPage() {
     if (!importFile) return;
     setImporting(true);
     try {
-      const token = document.cookie
-        .split(";")
-        .find((c) => c.trim().startsWith("token="))
-        ?.split("=")[1];
-      const formData = new FormData();
-      formData.append("file", importFile);
-      const res = await fetch(`${API_BASE}/api/data/import/contacts`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (res.ok) {
-        setShowImport(false);
-        setImportFile(null);
-        await fetchData();
-      }
+      await handleImportContacts(importFile);
+      setShowImport(false);
+      setImportFile(null);
+      await fetchData();
     } catch (err) {
       console.error("Import failed:", err);
     } finally {

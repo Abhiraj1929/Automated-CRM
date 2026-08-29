@@ -3,6 +3,7 @@
 // ============================================================
 const { supabase } = require("../config/supabase");
 const { logActivity } = require("../middleware/activityLogger");
+const { runWorkflow } = require("../services/workflowEngine");
 
 const getContacts = async (req, res, next) => {
   try {
@@ -70,6 +71,7 @@ const createContact = async (req, res, next) => {
 
     if (error) throw error;
     logActivity({ userId: req.user.id, action: "contact.created", entityType: "contact", entityId: data.id, details: { name: `${first_name} ${last_name}` } });
+    runWorkflow("contact", "on_create", data, null, req.user.organization_id).catch(() => {});
     res.status(201).json({ success: true, data });
   } catch (error) { next(error); }
 };
@@ -87,6 +89,7 @@ const updateContact = async (req, res, next) => {
 
     if (error) throw error;
     logActivity({ userId: req.user.id, action: "contact.updated", entityType: "contact", entityId: id });
+    runWorkflow("contact", "on_update", data, null, req.user.organization_id).catch(() => {});
     res.json({ success: true, data });
   } catch (error) { next(error); }
 };

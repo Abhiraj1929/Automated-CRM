@@ -3,20 +3,30 @@
 // ============================================================
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Sparkles, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Show timeout message if redirected due to session expiry
+  useEffect(() => {
+    const reason = searchParams.get("reason");
+    const message = searchParams.get("message");
+    if (reason === "timeout") {
+      setError(message || "Your session expired due to inactivity. Please log in again.");
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,8 +36,19 @@ export default function LoginPage() {
     const result = await login(email, password);
 
     if (result.success) {
-      router.push("/dashboard");
+      if (result.user?.is_super_admin) {
+        router.push("/super-admin");
+      } else if (result.user?.onboarding_completed === false) {
+        router.push("/onboarding");
+      } else {
+        router.push("/dashboard");
+      }
     } else {
+      if (result.error?.includes("awaiting payment") || result.error?.includes("workspace is awaiting")) {
+        setError("");
+        router.push(`/payment?email=${encodeURIComponent(email)}`);
+        return;
+      }
       setError(result.error || "Login failed");
     }
 
@@ -37,19 +58,17 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "hsl(220, 14%, 96%)" }}>
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-2xl tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>CRM</span>
+          <span className="font-bold text-2xl tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Pulse CRM</span>
         </div>
 
-        {/* Login Card */}
         <div className="rounded-xl p-8 shadow-sm" style={{ backgroundColor: "white", border: "1px solid hsl(220, 13%, 91%)" }}>
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold" style={{ color: "hsl(220, 13%, 18%)" }}>Welcome back</h2>
-            <p className="text-sm mt-1" style={{ color: "hsl(220, 9%, 46%)" }}>Sign in to your account to continue</p>
+            <p className="text-sm mt-1" style={{ color: "hsl(220, 9%, 46%)" }}>Sign in to your workspace</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,11 +126,28 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm mt-4" style={{ color: "hsl(220, 9%, 46%)" }}>
-            Contact your administrator for login credentials
+          <p className="text-center text-sm mt-5" style={{ color: "hsl(220, 9%, 46%)" }}>
+            Don&apos;t have an account?{" "}
+            <a href="/signup" className="font-medium text-blue-600 hover:underline">Create one</a>
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+function LoadingSpinner() {
+  return (
+    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: "hsl(220, 14%, 96%)" }}>
+      <Loader2 className="h-8 w-8 animate-spin" style={{ color: "hsl(221, 83%, 53%)" }} />
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <LoginForm />
+    </Suspense>
   );
 }

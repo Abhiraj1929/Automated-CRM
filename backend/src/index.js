@@ -26,12 +26,20 @@ const importExportRoutes = require("./routes/importExport");
 const reportRoutes = require("./routes/reports");
 const billingRoutes = require("./routes/billing");
 const webhookRoutes = require("./routes/webhooks");
+const superAdminRoutes = require("./routes/superAdmin");
+const adminRoutes = require("./routes/admin");
+const dataSourcesRoutes = require("./routes/dataSources");
+const ingestionRoutes = require("./routes/ingestion");
+const integrationRoutes = require("./routes/integrations");
+const invitationRoutes = require("./routes/invitations");
+const assignmentRuleRoutes = require("./routes/assignmentRules");
 const stripeService = require("./services/stripeService");
 
 // Import services
 const emailService = require("./services/emailService");
 const storageService = require("./services/storageService");
 const websocketService = require("./services/websocketService");
+const dataSourceService = require("./services/dataSourceService");
 
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
@@ -107,6 +115,26 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/data", importExportRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/billing", billingRoutes);
+app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/data-sources", dataSourcesRoutes);
+app.use("/api/ingest", ingestionRoutes);
+app.use("/api/integrations", integrationRoutes);
+app.use("/api/invitations", invitationRoutes);
+app.use("/api/assignment-rules", assignmentRuleRoutes);
+
+// ============================================================
+// Data Source Scheduler — Sync all active sources every 30 min
+// ============================================================
+const SYNC_INTERVAL = 30 * 60 * 1000; // 30 minutes
+setInterval(async () => {
+  try {
+    logger.info("Running scheduled data source sync");
+    await dataSourceService.syncAll();
+  } catch (err) {
+    logger.error("Scheduled data source sync failed", { error: err.message });
+  }
+}, SYNC_INTERVAL);
 
 // Health check (no rate limit)
 app.get("/api/health", (req, res) => {
@@ -154,6 +182,10 @@ server.listen(PORT, () => {
     environment: process.env.NODE_ENV || "development",
     pid: process.pid,
   });
+
+  // Initialize background scheduler with node-cron
+  const { initializeScheduler } = require("./services/schedulerService");
+  initializeScheduler().catch((err) => logger.error("Scheduler init failed", { error: err.message }));
 });
 
 // ============================================================

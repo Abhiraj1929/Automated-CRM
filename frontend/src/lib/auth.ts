@@ -23,6 +23,9 @@ export interface User {
   designation?: string;
   status: string;
   profile_image?: string;
+  is_super_admin?: boolean;
+  onboarding_completed?: boolean;
+  organization_id?: string;
   created_at: string;
   updated_at: string;
   manager?: { id: string; name: string; email: string } | null;
@@ -117,23 +120,32 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Routes that should NOT trigger the global 401 redirect
+const PUBLIC_AUTH_ROUTES = ["/auth/login", "/auth/signup", "/auth/register", "/auth/refresh"];
+
 // Handle 401 responses globally
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // Try refresh
-      try {
-        const refreshResult = await refreshAuthToken();
-        if (refreshResult.success) {
-          return apiClient(error.config); // Retry original request
+      // Don't redirect on public auth endpoints (login/signup don't have sessions)
+      const requestUrl = error.config?.url || "";
+      const isPublicAuth = PUBLIC_AUTH_ROUTES.some((r) => requestUrl.includes(r));
+
+      if (!isPublicAuth) {
+        // Try refresh
+        try {
+          const refreshResult = await refreshAuthToken();
+          if (refreshResult.success) {
+            return apiClient(error.config); // Retry original request
+          }
+        } catch {
+          // Refresh failed
         }
-      } catch {
-        // Refresh failed
-      }
-      // Redirect to login
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
+        // Redirect to landing page (logout destroys session)
+        if (typeof window !== "undefined") {
+          window.location.href = "/";
+        }
       }
     }
     return Promise.reject(error);

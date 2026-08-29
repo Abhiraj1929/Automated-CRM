@@ -1,35 +1,30 @@
-# ============================================================
-# AI CRM ML Service - FastAPI Application
-# ============================================================
-# This service provides lead scoring predictions using a trained
-# scikit-learn model. The model analyzes lead features and outputs
-# a score between 0-100 indicating lead quality.
-# ============================================================
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+"""
+FastAPI Application — Multi-tenant lead scoring API.
+Supports vertical-specific model loading, prediction, training, and model info.
+"""
+import os
+import sys
+import asyncio
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-import numpy as np
-import uvicorn
-import logging
-from datetime import datetime
 
-# Import the scoring engine
-from app.models.scorer import LeadScorer
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .models.scorer import get_scorer, LeadScorer
+from .models.vertical_config import SUPPORTED_VERTICALS, get_vertical_config, get_feature_names
+from .models.train_vertical import train_tenant_model, train_all_verticals
 
-# Initialize FastAPI app
+# ============================================================
+# App
+# ============================================================
 app = FastAPI(
-    title="AI CRM Lead Scoring Service",
-    description="Machine learning-powered lead scoring API",
-    version="1.0.0",
+    title="Pulse CRM Lead Scoring API",
+    description="Multi-tenant ML lead scoring engine supporting B2B, Real Estate, E-Commerce, and Professional Services verticals.",
+    version="4.0.0",
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,229 +33,261 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize the lead scorer
-lead_scorer = LeadScorer()
-
-
 # ============================================================
-# Pydantic Models for Request/Response
+# Pydantic Models
 # ============================================================
-
 class LeadScoreRequest(BaseModel):
-    """Request model for lead scoring prediction"""
-    lead_id: str
-    email: str
+    lead_id: Optional[str] = None
+    vertical_type: Optional[str] = Field(None, description="Industry vertical: b2b, real_estate, ecommerce, services")
+    email: Optional[str] = None
     company: Optional[str] = None
     industry: Optional[str] = None
     company_size: Optional[int] = None
     lead_source: Optional[str] = None
     page_views: Optional[int] = None
-    time_on_site: Optional[float] = None
+    time_on_site: Optional[int] = None
     email_opened: Optional[bool] = None
     form_submitted: Optional[bool] = None
     demo_requested: Optional[bool] = None
     status: Optional[str] = None
     rating: Optional[str] = None
-    activity_count: Optional[int] = 0
-    completed_activities: Optional[int] = 0
-    overdue_activities: Optional[int] = 0
-    has_opportunity: Optional[int] = 0
-    opp_value: Optional[float] = 0
+    activity_count: Optional[int] = None
+    completed_activities: Optional[int] = None
+    overdue_activities: Optional[int] = None
+    has_opportunity: Optional[bool] = None
+    opp_value: Optional[float] = None
+    # Real Estate fields
+    budget: Optional[float] = None
+    property_type: Optional[str] = None
+    pre_approved_mortgage: Optional[bool] = None
+    property_views: Optional[int] = None
+    scheduled_tours: Optional[int] = None
+    location_match_score: Optional[float] = None
+    days_since_inquiry: Optional[int] = None
+    # E-Commerce fields
+    cart_value: Optional[float] = None
+    items_in_cart: Optional[int] = None
+    items_viewed: Optional[int] = None
+    cart_abandoned: Optional[bool] = None
+    past_orders_count: Optional[int] = None
+    avg_order_value: Optional[float] = None
+    loyalty_member: Optional[bool] = None
+    days_since_last_visit: Optional[int] = None
+    # Services fields
+    project_budget: Optional[float] = None
+    timeline_urgency: Optional[str] = None
+    service_type: Optional[str] = None
+    form_complexity: Optional[int] = None
+    consultation_requested: Optional[bool] = None
+    engagement_score: Optional[float] = None
+
+    class Config:
+        extra = "allow"
 
 
 class ScoreFactor(BaseModel):
-    """Individual factor contributing to the score"""
     feature: str
-    impact: float
-    description: str
+    importance: float
+    value: Any
+    impact: str
 
 
 class LeadScoreResponse(BaseModel):
-    """Response model for lead scoring prediction"""
-    lead_id: str
-    score: int  # 0-100
-    category: str  # "high", "moderate", "low"
-    confidence: float  # 0-1
+    score: float
+    category: str
+    confidence: float
     factors: List[ScoreFactor]
     model_version: str
+    vertical_type: str
+    method: str
+    lead_id: Optional[str] = None
     timestamp: str
 
 
 class BatchScoreRequest(BaseModel):
-    """Request model for batch scoring"""
     leads: List[LeadScoreRequest]
+    vertical_type: Optional[str] = None
 
 
 class BatchScoreResponse(BaseModel):
-    """Response model for batch scoring"""
     results: List[LeadScoreResponse]
-    total_processed: int
+    count: int
     average_score: float
+    vertical_type: str
+
+
+class TrainRequest(BaseModel):
+    vertical_type: str
+    force_synthetic: bool = False
+
+
+class TrainResponse(BaseModel):
+    vertical_type: str
+    model_version: str
+    training_accuracy: float
+    cv_accuracy: float
+    trained_on_real_data: bool
+    n_samples: int
+    n_features: int
 
 
 class HealthResponse(BaseModel):
-    """Health check response"""
     status: str
-    model_loaded: bool
-    model_version: str
+    version: str
+    models_loaded: Dict[str, bool]
+    available_verticals: List[str]
     timestamp: str
 
 
 # ============================================================
-# API Endpoints
+# Startup
 # ============================================================
+@app.on_event("startup")
+async def startup_event():
+    """Load all available models on startup."""
+    scorer = get_scorer()
+    results = scorer.load_all_models()
+    loaded = [v for v, ok in results.items() if ok]
+    print(f"[STARTUP] Loaded models for verticals: {loaded or 'none (training required)'}")
+    print(f"[STARTUP] Supported verticals: {SUPPORTED_VERTICALS}")
 
+
+# ============================================================
+# Endpoints
+# ============================================================
 @app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint for the ML service"""
+async def health():
+    """Health check with model load status per vertical."""
+    scorer = get_scorer()
+    model_info = scorer.get_model_info()
     return HealthResponse(
         status="healthy",
-        model_loaded=lead_scorer.is_loaded,
-        model_version=lead_scorer.model_version,
-        timestamp=datetime.utcnow().isoformat(),
+        version="4.0.0",
+        models_loaded={v: scorer.is_loaded(v) for v in SUPPORTED_VERTICALS},
+        available_verticals=SUPPORTED_VERTICALS,
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
 
 @app.post("/predict-score", response_model=LeadScoreResponse)
 async def predict_score(request: LeadScoreRequest):
     """
-    Predict lead score based on features.
-    
-    The model analyzes various lead attributes and engagement metrics
-    to produce a score from 0-100:
-    - 70-100: High-value lead (priority outreach)
-    - 40-69: Medium-value lead (nurture campaign)
-    - 0-39: Low-value lead (automated engagement)
+    Score a single lead. Pass vertical_type for vertical-specific scoring,
+    or omit for auto-detection based on lead fields.
+    Non-blocking: CPU work runs in thread pool via asyncio.to_thread.
     """
-    try:
-        logger.info(f"Scoring lead: {request.lead_id}")
-        
-        # Run prediction
-        prediction = lead_scorer.predict(
-            email=request.email,
-            company=request.company,
-            industry=request.industry,
-            company_size=request.company_size,
-            lead_source=request.lead_source,
-            page_views=request.page_views,
-            time_on_site=request.time_on_site,
-            email_opened=request.email_opened,
-            form_submitted=request.form_submitted,
-            demo_requested=request.demo_requested,
-            status=request.status,
-            rating=request.rating,
-            activity_count=request.activity_count,
-            completed_activities=request.completed_activities,
-            overdue_activities=request.overdue_activities,
-            has_opportunity=request.has_opportunity,
-            opp_value=request.opp_value,
-        )
-        
-        # Category comes directly from the model
-        score = prediction["score"]
-        category = prediction.get("category", "low")
-        
-        return LeadScoreResponse(
-            lead_id=request.lead_id,
-            score=score,
-            category=category,
-            confidence=prediction["confidence"],
-            factors=prediction["factors"],
-            model_version=lead_scorer.model_version,
-            timestamp=datetime.utcnow().isoformat(),
-        )
-        
-    except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+    scorer = get_scorer()
+    lead_data = request.model_dump(exclude_none=True)
+    vertical_type = request.vertical_type
+
+    result = await scorer.predict_async(lead_data, vertical_type=vertical_type)
+
+    return LeadScoreResponse(
+        score=result["score"],
+        category=result["category"],
+        confidence=result["confidence"],
+        factors=[ScoreFactor(**f) for f in result["factors"]],
+        model_version=result["model_version"],
+        vertical_type=result["vertical_type"],
+        method=result["method"],
+        lead_id=request.lead_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 @app.post("/predict-score/batch", response_model=BatchScoreResponse)
 async def predict_score_batch(request: BatchScoreRequest):
-    """
-    Batch score multiple leads in a single request.
-    Useful for scoring all leads at once or processing imports.
-    """
-    try:
-        results = []
-        
-        for lead in request.leads:
-            prediction = lead_scorer.predict(
-                email=lead.email,
-                company=lead.company,
-                industry=lead.industry,
-                company_size=lead.company_size,
-                lead_source=lead.lead_source,
-                page_views=lead.page_views,
-                time_on_site=lead.time_on_site,
-            )
-            
-            score = prediction["score"]
-            category = prediction.get("category", "low")
-            
-            results.append(LeadScoreResponse(
-                lead_id=lead.lead_id,
-                score=score,
-                category=category,
-                confidence=prediction["confidence"],
-                factors=prediction["factors"],
-                model_version=lead_scorer.model_version,
-                timestamp=datetime.utcnow().isoformat(),
-            ))
-        
-        avg_score = sum(r.score for r in results) / len(results) if results else 0
-        
-        return BatchScoreResponse(
-            results=results,
-            total_processed=len(results),
-            average_score=round(avg_score, 2),
-        )
-        
-    except Exception as e:
-        logger.error(f"Batch prediction error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Batch prediction failed: {str(e)}")
+    """Score multiple leads. Non-blocking parallel execution."""
+    scorer = get_scorer()
+    vertical = request.vertical_type or "b2b"
+
+    leads_data = []
+    for lead in request.leads:
+        ld = lead.model_dump(exclude_none=True)
+        if not ld.get("vertical_type"):
+            ld["vertical_type"] = vertical
+        leads_data.append(ld)
+
+    results_raw = await scorer.predict_batch_async(leads_data, vertical_type=vertical)
+
+    results = []
+    for lead_id, result in zip([l.lead_id for l in request.leads], results_raw):
+        results.append(LeadScoreResponse(
+            score=result["score"],
+            category=result["category"],
+            confidence=result["confidence"],
+            factors=[ScoreFactor(**f) for f in result["factors"]],
+            model_version=result["model_version"],
+            vertical_type=result["vertical_type"],
+            method=result["method"],
+            lead_id=lead_id,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        ))
+
+    avg_score = sum(r.score for r in results) / len(results) if results else 0
+
+    return BatchScoreResponse(
+        results=results,
+        count=len(results),
+        average_score=round(avg_score, 1),
+        vertical_type=vertical,
+    )
 
 
 @app.get("/model/info")
-async def get_model_info():
-    """Get information about the current model"""
-    return {
-        "model_version": lead_scorer.model_version,
-        "model_type": "GradientBoostingClassifier",
-        "features_used": lead_scorer.feature_names,
-        "is_loaded": lead_scorer.is_loaded,
-        "categories": ["high", "moderate", "low"],
-        "accuracy": "see training logs",
-    }
+async def model_info(vertical_type: Optional[str] = Query(None)):
+    """Get model metadata. Omit vertical_type to get info for all loaded models."""
+    scorer = get_scorer()
+    return scorer.get_model_info(vertical_type)
 
 
-# ============================================================
-# Application Startup
-# ============================================================
+@app.get("/verticals")
+async def list_verticals():
+    """List all supported industry verticals with their feature definitions."""
+    verticals = []
+    for v in SUPPORTED_VERTICALS:
+        config = get_vertical_config(v)
+        verticals.append({
+            "vertical_type": v,
+            "display_name": config.display_name,
+            "description": config.description,
+            "features": [f.name for f in config.features],
+            "feature_count": len(config.features),
+            "categorical_values": config.categorical_values,
+            "target_mapping": config.target_mapping,
+        })
+    return {"verticals": verticals, "count": len(verticals)}
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize resources on application startup"""
-    logger.info("🚀 Starting AI CRM ML Service...")
-    lead_scorer.load_model()
-    logger.info("✅ ML Service ready for predictions")
 
+@app.post("/train", response_model=TrainResponse)
+async def train_model(request: TrainRequest):
+    """Train a model for a specific vertical with atomic hot-swap."""
+    if request.vertical_type not in SUPPORTED_VERTICALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown vertical: {request.vertical_type}. Supported: {SUPPORTED_VERTICALS}",
+        )
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup resources on application shutdown"""
-    logger.info("👋 Shutting down ML Service...")
-
-
-# ============================================================
-# Run the application
-# ============================================================
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info",
+    result = await asyncio.to_thread(
+        train_tenant_model,
+        request.vertical_type,
+        force_synthetic=request.force_synthetic,
     )
+
+    # Hot-swap the new model atomically
+    scorer = get_scorer()
+    await asyncio.to_thread(scorer.load_model, request.vertical_type)
+
+    return TrainResponse(**result)
+
+
+@app.post("/train/all")
+async def train_all(force_synthetic: bool = False):
+    """Train models for all supported verticals."""
+    results = await asyncio.to_thread(train_all_verticals, force_synthetic=force_synthetic)
+
+    scorer = get_scorer()
+    for r in results:
+        await asyncio.to_thread(scorer.load_model, r["vertical_type"])
+
+    return {"results": results, "count": len(results)}

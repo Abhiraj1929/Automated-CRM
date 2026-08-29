@@ -1,6 +1,7 @@
 const { Parser } = require('json2csv');
 const XLSX = require('xlsx');
 const { supabase } = require('../config/supabase');
+const { scoreAndUpdateLead } = require('./scoringService');
 
 class ImportExportService {
   // ============ EXPORT ============
@@ -83,30 +84,23 @@ class ImportExportService {
 
     for (const row of rows) {
       try {
-        const lead = {
-          title: row.title || row.Title || 'Imported Lead',
-          name: row.name || row.Name || row.full_name || '',
-          email: row.email || row.Email || '',
-          phone: row.phone || row.Phone || '',
-          company: row.company || row.Company || '',
-          status: row.status || row.Status || 'new',
-          rating: row.rating || row.Rating || 'warm',
-          owner_id: userId,
-          source: row.source || row.Source || 'import',
-          notes: row.notes || row.Notes || '',
-        };
+        const firstName = row.first_name || row.FirstName || row.firstname || row.first || '';
+        const lastName = row.last_name || row.LastName || row.lastname || row.last || row.surname || '';
+        const fullName = row.name || row.Name || row.full_name || row.FullName || '';
+        const nameParts = fullName ? fullName.trim().split(/\s+/) : [];
+        const finalFirst = firstName || nameParts[0] || '';
+        const finalLast = lastName || nameParts.slice(1).join(' ') || '';
 
-        if (!lead.name || !lead.email) {
+        if (!finalFirst || !row.email) {
           results.skipped++;
-          results.errors.push(`Skipped row: missing name or email`);
+          results.errors.push(`Skipped row: missing first_name or email`);
           continue;
         }
 
-        // Check duplicate
         const { data: existing } = await supabase
           .from('leads')
           .select('id')
-          .eq('email', lead.email)
+          .eq('email', row.email)
           .limit(1);
 
         if (existing && existing.length > 0) {
@@ -114,12 +108,34 @@ class ImportExportService {
           continue;
         }
 
-        const { error } = await supabase.from('leads').insert(lead);
+        const lead = {
+          first_name: finalFirst,
+          last_name: finalLast,
+          email: row.email || row.Email || '',
+          phone: row.phone || row.Phone || row.mobile || row.Mobile || '',
+          company: row.company || row.Company || '',
+          title: row.title || row.Title || 'Imported Lead',
+          industry: row.industry || row.Industry || null,
+          source: row.source || row.Source || 'import',
+          status: row.status || row.Status || 'new',
+          rating: row.rating || row.Rating || 'warm',
+          annual_revenue: row.annual_revenue ? parseFloat(row.annual_revenue) : null,
+          number_of_employees: row.number_of_employees ? parseInt(row.number_of_employees) : null,
+          website: row.website || row.Website || null,
+          description: row.description || row.Description || row.notes || row.Notes || '',
+          owner_id: userId,
+          created_by: userId,
+        };
+
+        const { data: inserted, error } = await supabase.from('leads').insert(lead).select('id').single();
         if (error) {
           results.skipped++;
           results.errors.push(error.message);
         } else {
           results.imported++;
+          if (inserted && inserted.id) {
+            scoreAndUpdateLead(inserted.id).catch(() => {});
+          }
         }
       } catch (err) {
         results.skipped++;

@@ -11,32 +11,75 @@ if (STRIPE_SECRET) {
 }
 
 const PLAN_MAP = {
-  starter: { price_monthly: "price_starter_monthly", price_annual: "price_starter_annual", quota: 100 },
-  pro: { price_monthly: "price_pro_monthly", price_annual: "price_pro_annual", quota: 5000 },
-  enterprise: { price_monthly: "price_enterprise_monthly", price_annual: "price_enterprise_annual", quota: -1 },
+  starter: { price_monthly: "price_starter_monthly", price_annual: "price_starter_annual", quota: 100, name: "Starter" },
+  pro: { price_monthly: "price_pro_monthly", price_annual: "price_pro_annual", quota: 5000, name: "Pro" },
+  enterprise: { price_monthly: "price_enterprise_monthly", price_annual: "price_enterprise_annual", quota: -1, name: "Enterprise" },
 };
 
 function isConfigured() {
   return !!stripe;
 }
 
-async function createCheckoutSession({ planId, billing, customerEmail, orgId }) {
+async function createCheckoutSession({ planId, billing, customerEmail, orgId, userId, type }) {
   if (!stripe) throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY in .env");
 
   const plan = PLAN_MAP[planId] || PLAN_MAP.pro;
   const priceId = billing === "annual" ? plan.price_annual : plan.price_monthly;
 
-  const session = await stripe.checkout.sessions.create({
+  const metadata = {
+    org_id: orgId || "",
+    user_id: userId || "",
+    plan_id: planId || "pro",
+    billing: billing || "monthly",
+    trialDays: 7,
+  };
+
+  if (type === "trial") {
+    metadata.type = "trial";
+  }
+
+  const sessionParams = {
     mode: "subscription",
     payment_method_types: ["card"],
     customer_email: customerEmail,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard?upgraded=1`,
-    cancel_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/pricing`,
-    metadata: { org_id: orgId || "", plan_id: planId, billing },
+    success_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/payment`,
+    metadata,
+  };
+
+  // For trial type, set trial_period_days on the subscription
+  if (type === "trial") {
+    sessionParams.subscription_data = {
+      trial_period_days: 7,
+      metadata,
+    };
+  }
+
+  const session = await stripe.checkout.sessions.create(sessionParams);
+  return session;
+}
+
+async function verifySession(sessionId) {
+  if (!stripe) throw new Error("Stripe not configured");
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: ["customer", "subscription"],
   });
 
-  return session;
+  return {
+    id: session.id,
+    status: session.status,
+    payment_status: session.payment_status,
+    customer_email: session.customer_details?.email || session.customer_email,
+    customer_name: session.customer_details?.name,
+    plan_id: session.metadata?.plan_id,
+    billing: session.metadata?.billing,
+    trialDays: session.metadata?.trialDays,
+    subscription_id: session.subscription?.id,
+    subscription_status: session.subscription?.status,
+    customer_id: session.customer?.id,
+  };
 }
 
 async function constructWebhookEvent(body, signature) {
@@ -49,4 +92,10 @@ async function getSubscription(subscriptionId) {
   return stripe.subscriptions.retrieve(subscriptionId);
 }
 
-module.exports = { isConfigured, createCheckoutSession, constructWebhookEvent, getSubscription, PLAN_MAP };
+async function getSubscriptions(customerId) {
+  if (!stripe) return [];
+  const result = await stripe.subscriptions.list({ customer: customerId, limit: 5 });
+  return result.data || [];
+}
+
+module.exports = { isConfigured, createCheckoutSession, verifySession, constructWebhookEvent, getSubscription, getSubscriptions, PLAN_MAP };

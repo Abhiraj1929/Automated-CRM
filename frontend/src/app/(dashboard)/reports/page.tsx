@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiClient } from "@/lib/auth";
 import {
   Loader2,
   Download,
@@ -36,14 +37,8 @@ interface ScheduledReport {
 }
 
 const downloadFile = async (url: string, filename: string) => {
-  const token = document.cookie
-    .split(";")
-    .find((c) => c.trim().startsWith("token="))
-    ?.split("=")[1];
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const blob = await res.blob();
+  const res = await apiClient.get(url, { responseType: "blob" });
+  const blob = new Blob([res.data]);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -113,14 +108,8 @@ export default function ReportsPage() {
   const fetchScheduled = useCallback(async () => {
     setLoadingScheduled(true);
     try {
-      const token = document.cookie
-        .split(";")
-        .find((c) => c.trim().startsWith("token="))
-        ?.split("=")[1];
-      const res = await fetch(`${API_BASE}/api/reports/scheduled`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res = await apiClient.get("/reports/scheduled");
+      const data = res.data;
       setScheduledReports(data.data || data || []);
     } catch {
       setScheduledReports([]);
@@ -152,19 +141,8 @@ export default function ReportsPage() {
   const handleCreateScheduled = async () => {
     setCreating(true);
     try {
-      const token = document.cookie
-        .split(";")
-        .find((c) => c.trim().startsWith("token="))
-        ?.split("=")[1];
-      const res = await fetch(`${API_BASE}/api/reports/scheduled`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(newReport),
-      });
-      if (res.ok) {
+      const res = await apiClient.post("/reports/scheduled", newReport);
+      if (res.data?.success !== false) {
         setShowCreateModal(false);
         setNewReport({ name: "", report_type: "pipeline", format: "csv", frequency: "weekly" });
         fetchScheduled();
@@ -178,14 +156,7 @@ export default function ReportsPage() {
 
   const handleDeleteScheduled = async (id: string) => {
     try {
-      const token = document.cookie
-        .split(";")
-        .find((c) => c.trim().startsWith("token="))
-        ?.split("=")[1];
-      await fetch(`${API_BASE}/api/reports/scheduled/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiClient.delete(`/reports/scheduled/${id}`);
       setScheduledReports((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       console.error("Delete failed:", err);

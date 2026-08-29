@@ -127,6 +127,7 @@ const createUser = async (req, res, next) => {
         phone: phone || null,
         department: department || null,
         designation: designation || null,
+        organization_id: req.user.organization_id,
         status: "active",
       })
       .select("id, name, email, role, manager_id, phone, department, designation, status, created_at")

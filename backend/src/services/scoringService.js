@@ -63,6 +63,47 @@ const scoreAndUpdateLead = async (leadId) => {
   return updated;
 };
 
+// ============================================================
+// Score Decay — reduce scores over time without engagement
+// ============================================================
+const applyScoreDecay = async () => {
+  try {
+    const DECAY_RATE = 5; // points per decay cycle
+    const DECAY_AFTER_DAYS = 30; // start decaying after 30 days of no activity
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - DECAY_AFTER_DAYS);
+
+    const { data: staleLeads } = await supabase
+      .from("leads")
+      .select("id, lead_score, last_activity_at")
+      .neq("status", "converted")
+      .lt("last_activity_at", cutoffDate.toISOString())
+      .gt("lead_score", 0);
+
+    if (!staleLeads || staleLeads.length === 0) return { decayed: 0 };
+
+    let decayed = 0;
+    for (const lead of staleLeads) {
+      const newScore = Math.max(0, (lead.lead_score || 0) - DECAY_RATE);
+      let category = "low";
+      if (newScore >= 60) category = "high";
+      else if (newScore >= 30) category = "medium";
+
+      await supabase
+        .from("leads")
+        .update({ lead_score: newScore, score_category: category })
+        .eq("id", lead.id);
+
+      decayed++;
+    }
+
+    return { decayed };
+  } catch (err) {
+    return { decayed: 0, error: err.message };
+  }
+};
+
 // Get scoring rules
 const getScoringRules = async (req, res, next) => {
   try {
@@ -101,4 +142,4 @@ const rescoreAll = async (req, res, next) => {
   catch (error) { next(error); }
 };
 
-module.exports = { scoreLead, scoreAndUpdateLead, rescoreAllLeads, getScoringRules, createScoringRule, updateScoringRule, deleteScoringRule, rescoreAll };
+module.exports = { scoreLead, scoreAndUpdateLead, rescoreAllLeads, applyScoreDecay, getScoringRules, createScoringRule, updateScoringRule, deleteScoringRule, rescoreAll };

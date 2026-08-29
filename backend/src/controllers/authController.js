@@ -6,9 +6,10 @@ const jwt = require("jsonwebtoken");
 const { supabase } = require("../config/supabase");
 const { JWT_SECRET } = require("../middleware/auth");
 const { logActivity } = require("../middleware/activityLogger");
+const { blacklistToken } = require("../config/redis");
 
-const TOKEN_EXPIRY = "7d";
-const REFRESH_TOKEN_EXPIRY = "30d";
+const TOKEN_EXPIRY = process.env.SESSION_TIMEOUT || "24h";
+const REFRESH_TOKEN_EXPIRY = "7d";
 
 /**
  * Generate JWT token
@@ -49,7 +50,15 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Check if user is active
+    // Check if user is active — block pending (unpaid) and inactive users
+    if (user.status === "pending") {
+      return res.status(403).json({
+        success: false,
+        error: "Your account is awaiting payment confirmation. Please complete your subscription to activate.",
+        code: "PENDING_PAYMENT",
+      });
+    }
+
     if (user.status !== "active") {
       return res.status(403).json({
         success: false,
@@ -64,6 +73,23 @@ const login = async (req, res, next) => {
         success: false,
         error: "Invalid email or password",
       });
+    }
+
+    // Check if user's organization is pending payment
+    if (user.organization_id) {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("status")
+        .eq("id", user.organization_id)
+        .single();
+
+      if (org && org.status === "pending") {
+        return res.status(403).json({
+          success: false,
+          error: "Your workspace is awaiting payment. Please complete your subscription to activate.",
+          code: "PENDING_PAYMENT",
+        });
+      }
     }
 
     // Generate tokens
@@ -84,19 +110,19 @@ const login = async (req, res, next) => {
       entityId: user.id,
     });
 
-    // Set secure cookie
+    // Set secure cookie — matches JWT expiry
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: "/",
     };
 
     res.cookie("token", token, cookieOptions);
     res.cookie("refreshToken", refreshToken, {
       ...cookieOptions,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (refresh token lasts longer)
     });
 
     // Return user info (without password)
@@ -154,6 +180,7 @@ const register = async (req, res, next) => {
         phone: phone || null,
         department: department || null,
         designation: designation || null,
+        organization_id: req.user.organization_id,
         status: "active",
       })
       .select("id, name, email, role, manager_id, phone, department, designation, status, created_at")
@@ -185,7 +212,7 @@ const getMe = async (req, res, next) => {
   try {
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, name, email, role, manager_id, phone, department, designation, status, profile_image, created_at, updated_at")
+      .select("id, name, email, role, manager_id, phone, department, designation, status, profile_image, is_super_admin, organization_id, created_at, updated_at")
       .eq("id", req.user.id)
       .single();
 
@@ -223,6 +250,12 @@ const getMe = async (req, res, next) => {
  */
 const logout = async (req, res, next) => {
   try {
+    // Blacklist current token (requires Redis)
+    const token = req.cookies?.token || req.headers.authorization?.replace("Bearer ", "");
+    if (token) {
+      await blacklistToken(token);
+    }
+
     // Log activity
     logActivity({
       userId: req.user.id,
@@ -293,11 +326,11 @@ const refreshToken = async (req, res, next) => {
 
     res.cookie("token", newToken, {
       ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
     res.cookie("refreshToken", newRefreshToken, {
       ...cookieOptions,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     res.json({
@@ -316,13 +349,14 @@ const refreshToken = async (req, res, next) => {
 };
 
 /**
- * @desc    Public self-serve signup (creates organization + admin user)
+ * @desc    Public self-serve signup (creates PENDING organization + user)
+ *          User cannot log in until payment is confirmed via webhook.
  * @route   POST /api/auth/signup
  * @access  Public
  */
 const signup = async (req, res, next) => {
   try {
-    const { name, email, password, role, organization_id } = req.body;
+    const { name, email, password, companyName } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -341,30 +375,115 @@ const signup = async (req, res, next) => {
     // Check if user already exists
     const { data: existingUser } = await supabase
       .from("users")
-      .select("id")
+      .select("id, status, organization_id, name, email")
       .eq("email", email)
       .single();
 
-    if (existingUser) {
+    // If user exists and is active — check if their org is still pending (incomplete payment)
+    if (existingUser && existingUser.status === "active" && existingUser.organization_id) {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id, name, status, plan")
+        .eq("id", existingUser.organization_id)
+        .single();
+
+      if (org && org.status === "pending") {
+        // User signed up but never completed payment — allow resume
+        logActivity({
+          userId: existingUser.id,
+          action: "user.signup_resume_pending_payment",
+          entityType: "user",
+          entityId: existingUser.id,
+          details: { email, organization_id: org.id },
+        });
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            user: { id: existingUser.id, email: existingUser.email, name: existingUser.name, status: "active" },
+            organization: { id: org.id, name: org.name, status: org.status, plan: org.plan },
+            resumePayment: true,
+            message: "Your account exists but payment is incomplete. Redirecting to checkout...",
+          },
+        });
+      }
+
+      // User is active and org is active — truly already registered
       return res.status(409).json({
         success: false,
-        error: "An account with this email already exists",
+        error: "An account with this email already exists. Please log in.",
       });
     }
 
-    // Hash password
+    // If user exists but is pending (legacy path), allow re-creation
+    if (existingUser && existingUser.status === "pending") {
+      const salt = await bcrypt.genSalt(12);
+      const password_hash = await bcrypt.hash(password, salt);
+
+      await supabase
+        .from("users")
+        .update({ name, password_hash, updated_at: new Date().toISOString() })
+        .eq("id", existingUser.id);
+
+      // Find their pending org
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("id", (await supabase.from("users").select("organization_id").eq("id", existingUser.id).single()).data?.organization_id)
+        .single();
+
+      logActivity({
+        userId: existingUser.id,
+        action: "user.signup_resumed",
+        entityType: "user",
+        entityId: existingUser.id,
+        details: { email, organization_id: org?.id },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          user: { id: existingUser.id, email, name, status: "pending" },
+          organization: org ? { id: org.id } : null,
+          message: "Account ready for payment. Redirecting to checkout...",
+        },
+      });
+    }
+
+    // Create PENDING organization
+    const slug = (companyName || email.split("@")[0])
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const { data: org, error: orgErr } = await supabase
+      .from("organizations")
+      .insert({
+        name: companyName || `${name}'s Workspace`,
+        slug: `${slug}-${Date.now()}`,
+        plan: "pro",
+        status: "pending",
+        ai_score_quota_monthly: 500,
+        ai_score_used_this_month: 0,
+        billing_cycle: "monthly",
+      })
+      .select("id, name")
+      .single();
+
+    if (orgErr) throw orgErr;
+
+    // Hash password and create user (status: active, but org is pending)
     const salt = await bcrypt.genSalt(12);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // Create user as admin of their organization
     const { data: user, error } = await supabase
       .from("users")
       .insert({
         name,
         email,
         password_hash,
-        role: role || "admin",
-        organization_id: organization_id || null,
+        role: "admin",
+        organization_id: org.id,
         status: "active",
       })
       .select("id, name, email, role, organization_id, status, created_at")
@@ -372,35 +491,22 @@ const signup = async (req, res, next) => {
 
     if (error) throw error;
 
-    // Generate tokens and set cookies
-    const token = generateToken(user.id, user.role);
-    const refreshTokenVal = generateRefreshToken(user.id);
-
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/",
-    };
-
-    res.cookie("token", token, cookieOptions);
-    res.cookie("refreshToken", refreshTokenVal, {
-      ...cookieOptions,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
-
+    // NO JWT tokens issued — user must pay first
     logActivity({
       userId: user.id,
-      action: "user.signup",
+      action: "user.signup_pending",
       entityType: "user",
       entityId: user.id,
-      details: { role: user.role, email: user.email, organization_id },
+      details: { role: user.role, email: user.email, organization_id: org.id },
     });
 
     res.status(201).json({
       success: true,
-      data: { user, token, refreshToken: refreshTokenVal },
+      data: {
+        user: { id: user.id, email: user.email, name: user.name, status: "pending" },
+        organization: { id: org.id, name: org.name },
+        message: "Account created. Complete payment to activate your workspace.",
+      },
     });
   } catch (error) {
     next(error);

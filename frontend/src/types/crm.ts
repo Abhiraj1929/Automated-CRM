@@ -164,10 +164,36 @@ export interface Campaign {
   actual_cost: number;
   expected_leads: number;
   actual_leads: number;
+  member_count: number;
+  converted_leads: number;
+  converted_contacts: number;
+  converted_opportunities: number;
+  pipeline_value: number;
+  closed_value: number;
+  roi: number;
   description?: string;
   owner?: { id: string; name: string; email: string };
   created_at: string;
   updated_at: string;
+  // Analytics (from getCampaign detail)
+  status_breakdown?: Record<string, number>;
+  rating_breakdown?: Record<string, number>;
+  source_breakdown?: Record<string, number>;
+  avg_lead_score?: number;
+  responses?: CampaignResponse[];
+}
+
+export interface CampaignResponse {
+  id: string;
+  campaign_id: string;
+  lead_id?: string;
+  contact_id?: string;
+  response_type: "sent" | "opened" | "clicked" | "replied" | "bounced" | "converted";
+  channel: string;
+  metadata: Record<string, unknown>;
+  lead?: { first_name: string; last_name: string; email: string };
+  contact?: { first_name: string; last_name: string; email: string };
+  created_at: string;
 }
 
 export const CAMPAIGN_TYPES = [

@@ -191,7 +191,7 @@ export async function getProductStats() {
 // ============================================================
 // Campaigns
 // ============================================================
-export async function getCampaigns(params?: { status?: string; search?: string }) {
+export async function getCampaigns(params?: { status?: string; search?: string; type?: string }) {
   const response = await apiClient.get("/campaigns", { params });
   return response.data;
 }
@@ -209,6 +209,22 @@ export async function updateCampaign(id: string, data: Record<string, unknown>) 
 }
 export async function deleteCampaign(id: string) {
   const response = await apiClient.delete(`/campaigns/${id}`);
+  return response.data;
+}
+export async function getCampaignLeads(id: string, params?: { status?: string; search?: string; page?: number; limit?: number }) {
+  const response = await apiClient.get(`/campaigns/${id}/leads`, { params });
+  return response.data;
+}
+export async function linkLeadsToCampaign(id: string, leadIds: string[]) {
+  const response = await apiClient.post(`/campaigns/${id}/leads`, { lead_ids: leadIds });
+  return response.data;
+}
+export async function unlinkLeadFromCampaign(id: string, leadId: string) {
+  const response = await apiClient.delete(`/campaigns/${id}/leads/${leadId}`);
+  return response.data;
+}
+export async function logCampaignResponse(id: string, data: { lead_id?: string; contact_id?: string; response_type: string; channel?: string }) {
+  const response = await apiClient.post(`/campaigns/${id}/responses`, data);
   return response.data;
 }
 

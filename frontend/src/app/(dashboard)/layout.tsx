@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { SessionTimeoutBanner } from "@/components/auth/SessionTimeoutBanner";
 
 export default function DashboardLayout({
   children,
@@ -24,6 +25,7 @@ export default function DashboardLayout({
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         <main className="flex-1 overflow-auto min-w-0">{children}</main>
+        <SessionTimeoutBanner />
       </div>
     </ProtectedRoute>
   );

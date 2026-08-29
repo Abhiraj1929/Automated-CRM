@@ -7,12 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getAccounts, createAccount } from "@/lib/api";
+import { getAccounts, createAccount, exportData, importData } from "@/lib/api";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Account } from "@/types/crm";
 import { Plus, Search, Loader2, X, Building2, Download, Upload } from "lucide-react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export default function AccountsPage() {
   const router = useRouter();
@@ -39,9 +37,8 @@ export default function AccountsPage() {
   const handleExport = async (format: "csv" | "xlsx") => {
     setExporting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/data/export/accounts?format=${format}`);
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
+      const response = await exportData("accounts", format);
+      const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -62,10 +59,7 @@ export default function AccountsPage() {
     if (!file) return;
     setImporting(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch(`${API_BASE}/api/data/import/accounts`, { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Import failed");
+      await importData("accounts", file);
       await fetchData();
     } catch (err) {
       console.error("Import error:", err);

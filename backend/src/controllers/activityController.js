@@ -3,6 +3,7 @@
 // ============================================================
 const { supabase } = require("../config/supabase");
 const { logActivity } = require("../middleware/activityLogger");
+const { runWorkflow } = require("../services/workflowEngine");
 
 const getActivities = async (req, res, next) => {
   try {
@@ -60,6 +61,7 @@ const createActivity = async (req, res, next) => {
 
     if (error) throw error;
     logActivity({ userId: req.user.id, action: "activity.created", entityType: "activity", entityId: data.id, details: { type, subject } });
+    runWorkflow("activity", "on_create", data, null, req.user.organization_id).catch(() => {});
     res.status(201).json({ success: true, data });
   } catch (error) { next(error); }
 };
@@ -78,6 +80,7 @@ const updateActivity = async (req, res, next) => {
 
     if (error) throw error;
     logActivity({ userId: req.user.id, action: "activity.updated", entityType: "activity", entityId: id });
+    runWorkflow("activity", "on_update", data, null, req.user.organization_id).catch(() => {});
     res.json({ success: true, data });
   } catch (error) { next(error); }
 };
