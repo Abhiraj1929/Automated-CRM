@@ -11,7 +11,8 @@ const options = {
       contact: { name: "OptiRev Team" },
     },
     servers: [
-      { url: process.env.API_URL || "http://localhost:5000", description: "Development" },
+      { url: process.env.API_URL || "/api", description: "Default Server" },
+      { url: "http://localhost:5000", description: "Local Development" },
     ],
     components: {
       securitySchemes: {

@@ -10,7 +10,7 @@ import {
   Sparkles, Lock, Shield, CheckCircle, Loader2, AlertCircle, ArrowLeft,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const STRIPE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
 

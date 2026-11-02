@@ -30,7 +30,7 @@ function CheckoutContent() {
 
     try {
       const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+        process.env.NEXT_PUBLIC_API_URL || "/api";
       const res = await fetch(`${API_URL}/billing/create-checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

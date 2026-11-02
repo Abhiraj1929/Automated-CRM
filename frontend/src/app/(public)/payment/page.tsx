@@ -14,7 +14,7 @@ import {
   Bot, LayoutDashboard, Users, TrendingUp, Star, GripVertical, ArrowRight,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const planDetails: Record<string, { name: string; price: number; annual: number; features: string[] }> = {
   starter: {

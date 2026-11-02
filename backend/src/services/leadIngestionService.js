@@ -12,11 +12,15 @@ const assignmentService = require("./assignmentService");
 // ============================================================
 // ML Scoring — call FastAPI /predict-score
 // ============================================================
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://ml-service:8000";
+const getMlServiceUrl = () => {
+  const base = process.env.ML_SERVICE_URL || "http://ml-service:8000";
+  return base.replace(/\/+$/, "");
+};
 
 async function scoreWithML(lead) {
   try {
-    const resp = await fetch(`${ML_SERVICE_URL}/predict-score`, {
+    const targetUrl = new URL("/predict-score", getMlServiceUrl()).toString();
+    const resp = await fetch(targetUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

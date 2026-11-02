@@ -11,7 +11,7 @@ import {
   Mail, Lock, User, Building2, ArrowRight, Shield,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 function SuccessContent() {
   const router = useRouter();
