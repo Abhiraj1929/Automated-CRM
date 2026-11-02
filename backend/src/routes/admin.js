@@ -64,13 +64,16 @@ router.get("/overview", async (req, res, next) => {
       .select("id, name, email, role, created_at")
       .eq("organization_id", orgId);
 
+    const userIds = (users || []).map((u) => u.id);
+    const safeUserIds = userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"];
+
     // Entity counts
     const [leads, accounts, contacts, opportunities, activities] = await Promise.all([
-      supabase.from("leads").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
-      supabase.from("accounts").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
-      supabase.from("contacts").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
-      supabase.from("opportunities").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
-      supabase.from("activities").select("id", { count: "exact", head: true }).eq("organization_id", orgId),
+      supabase.from("leads").select("id", { count: "exact", head: true }).or(`organization_id.eq.${orgId},owner_id.in.(${safeUserIds.join(",")})`),
+      supabase.from("accounts").select("id", { count: "exact", head: true }).in("owner_id", safeUserIds),
+      supabase.from("contacts").select("id", { count: "exact", head: true }).in("owner_id", safeUserIds),
+      supabase.from("opportunities").select("id", { count: "exact", head: true }).in("owner_id", safeUserIds),
+      supabase.from("activities").select("id", { count: "exact", head: true }).in("owner_id", safeUserIds),
     ]);
 
     // Trial status
@@ -125,29 +128,32 @@ router.get("/analytics", async (req, res, next) => {
   try {
     const orgId = req.user.organization_id;
 
-    // Opportunities by stage
-    const { data: opps } = await supabase
-      .from("opportunities")
-      .select("id, name, value, stage, status, created_at, closed_at")
-      .eq("organization_id", orgId);
-
-    // Leads by status
-    const { data: leads } = await supabase
-      .from("leads")
-      .select("id, status, rating, source, created_at, converted_at")
-      .eq("organization_id", orgId);
-
-    // Activities
-    const { data: activities } = await supabase
-      .from("activities")
-      .select("id, type, status, due_date, completed_at, created_at")
-      .eq("organization_id", orgId);
-
     // Team members
     const { data: users } = await supabase
       .from("users")
       .select("id, name, email, role")
       .eq("organization_id", orgId);
+
+    const userIds = (users || []).map((u) => u.id);
+    const safeUserIds = userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"];
+
+    // Opportunities by stage
+    const { data: opps } = await supabase
+      .from("opportunities")
+      .select("id, name, amount, stage, close_date, created_at, updated_at, owner_id")
+      .in("owner_id", safeUserIds);
+
+    // Leads by status
+    const { data: leads } = await supabase
+      .from("leads")
+      .select("id, status, rating, source, created_at, converted_at, owner_id")
+      .or(`organization_id.eq.${orgId},owner_id.in.(${safeUserIds.join(",")})`);
+
+    // Activities
+    const { data: activities } = await supabase
+      .from("activities")
+      .select("id, type, status, due_date, completed_at, created_at, owner_id")
+      .in("owner_id", safeUserIds);
 
     const now = new Date();
     const thisMonth = now.toISOString().slice(0, 7);
@@ -158,12 +164,13 @@ router.get("/analytics", async (req, res, next) => {
     let wonValue = 0;
     let lostValue = 0;
     for (const opp of (opps || [])) {
+      const val = opp.amount || 0;
       if (!pipeline[opp.stage]) pipeline[opp.stage] = { count: 0, value: 0 };
       pipeline[opp.stage].count++;
-      pipeline[opp.stage].value += opp.value || 0;
-      totalPipelineValue += opp.value || 0;
-      if (opp.status === "won") wonValue += opp.value || 0;
-      if (opp.status === "lost") lostValue += opp.value || 0;
+      pipeline[opp.stage].value += val;
+      totalPipelineValue += val;
+      if (opp.stage === "closed_won") wonValue += val;
+      if (opp.stage === "closed_lost") lostValue += val;
     }
 
     // Lead conversion
@@ -194,13 +201,13 @@ router.get("/analytics", async (req, res, next) => {
 
     // Team performance
     const teamPerformance = (users || []).map((u) => {
-      const userOpps = (opps || []).filter((o) => o.assigned_to === u.id || o.created_by === u.id);
-      const userLeads = (leads || []).filter((l) => l.assigned_to === u.id);
-      const userActivities = (activities || []).filter((a) => a.assigned_to === u.id);
+      const userOpps = (opps || []).filter((o) => o.owner_id === u.id);
+      const userLeads = (leads || []).filter((l) => l.owner_id === u.id);
+      const userActivities = (activities || []).filter((a) => a.owner_id === u.id);
       return {
         user: u,
         opportunities: userOpps.length,
-        pipeline_value: userOpps.reduce((sum, o) => sum + (o.value || 0), 0),
+        pipeline_value: userOpps.reduce((sum, o) => sum + (o.amount || 0), 0),
         leads: userLeads.length,
         activities: userActivities.length,
         completed_activities: userActivities.filter((a) => a.status === "completed").length,
@@ -260,42 +267,45 @@ router.get("/activity", async (req, res, next) => {
     const orgId = req.user.organization_id;
     const limit = parseInt(req.query.limit) || 30;
 
+    // Get team user IDs for this organization
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, name")
+      .eq("organization_id", orgId);
+
+    const userIds = (users || []).map((u) => u.id);
+    const safeUserIds = userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"];
+
+    const userMap = {};
+    (users || []).forEach((u) => { userMap[u.id] = u.name; });
+
     // Recent activities
     const { data: activities } = await supabase
       .from("activities")
-      .select("id, type, subject, description, status, priority, due_date, assigned_to, created_by, created_at")
-      .eq("organization_id", orgId)
+      .select("id, type, subject, description, status, priority, due_date, owner_id, created_by, created_at")
+      .in("owner_id", safeUserIds)
       .order("created_at", { ascending: false })
       .limit(limit);
 
     // Recent opportunities changes
     const { data: recentOpps } = await supabase
       .from("opportunities")
-      .select("id, name, value, stage, status, updated_at")
-      .eq("organization_id", orgId)
+      .select("id, name, amount, stage, updated_at")
+      .in("owner_id", safeUserIds)
       .order("updated_at", { ascending: false })
       .limit(10);
 
     // Recent leads
     const { data: recentLeads } = await supabase
       .from("leads")
-      .select("id, name, company, status, rating, updated_at")
-      .eq("organization_id", orgId)
+      .select("id, first_name, last_name, company, status, rating, updated_at")
+      .or(`organization_id.eq.${orgId},owner_id.in.(${safeUserIds.join(",")})`)
       .order("updated_at", { ascending: false })
       .limit(10);
 
-    // Enrich with user names
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, name")
-      .eq("organization_id", orgId);
-
-    const userMap = {};
-    (users || []).forEach((u) => { userMap[u.id] = u.name; });
-
     const enrichedActivities = (activities || []).map((a) => ({
       ...a,
-      assigned_to_name: userMap[a.assigned_to] || null,
+      assigned_to_name: userMap[a.owner_id] || userMap[a.created_by] || null,
       created_by_name: userMap[a.created_by] || null,
     }));
 
@@ -313,19 +323,22 @@ router.get("/activity", async (req, res, next) => {
       ...(recentOpps || []).map((o) => ({
         type: "opportunity",
         icon: "💰",
-        text: `${o.name} — $${(o.value || 0).toLocaleString()}`,
+        text: `${o.name} — $${(Number(o.amount) || 0).toLocaleString()}`,
         detail: `Stage: ${o.stage}`,
-        status: o.status,
+        status: o.stage,
         date: o.updated_at,
       })),
-      ...(recentLeads || []).map((l) => ({
-        type: "lead",
-        icon: "👤",
-        text: `${l.name} — ${l.company || "N/A"}`,
-        detail: `Status: ${l.status}`,
-        status: l.rating,
-        date: l.updated_at,
-      })),
+      ...(recentLeads || []).map((l) => {
+        const leadName = [l.first_name, l.last_name].filter(Boolean).join(" ") || "Unnamed Lead";
+        return {
+          type: "lead",
+          icon: "👤",
+          text: `${leadName} — ${l.company || "N/A"}`,
+          detail: `Status: ${l.status || "new"}`,
+          status: l.rating || "cold",
+          date: l.updated_at,
+        };
+      }),
     ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
 
     res.json({ success: true, data: feed });
@@ -344,11 +357,22 @@ router.get("/users", async (req, res, next) => {
 
     const { data: users } = await supabase
       .from("users")
-      .select("id, name, email, role, is_active, last_login, created_at")
+      .select("id, name, email, role, status, updated_at, created_at")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: true });
 
-    res.json({ success: true, data: users || [] });
+    const mappedUsers = (users || []).map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      is_active: u.status === "active",
+      status: u.status,
+      last_login: u.updated_at,
+      created_at: u.created_at,
+    }));
+
+    res.json({ success: true, data: mappedUsers });
   } catch (error) {
     next(error);
   }

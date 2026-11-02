@@ -35,7 +35,7 @@ export function Navbar() {
             className="text-xl font-bold tracking-tight"
             style={{ color: "hsl(220, 13%, 18%)" }}
           >
-            Pulse CRM
+            OptiRev
           </span>
         </Link>
 

@@ -140,7 +140,7 @@ export default function IntegrationsPage() {
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>Integrations</h1>
           <p className="text-sm mt-1" style={{ color: "hsl(220, 9%, 46%)" }}>
-            Connect external platforms to auto-collect leads into your CRM
+            Connect external platforms to auto-collect leads into OptiRev
           </p>
         </div>
         <Button onClick={() => setShowAddDialog(true)} style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>

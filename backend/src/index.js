@@ -1,5 +1,5 @@
 // ============================================================
-// AI CRM Backend - Production Configuration
+// OptiRev Backend - Production Configuration
 // ============================================================
 require("dotenv").config();
 const express = require("express");
@@ -178,7 +178,7 @@ app.use(errorHandler);
 // Start Server (using http.createServer for WebSocket support)
 // ============================================================
 server.listen(PORT, () => {
-  logger.info(`AI CRM Backend running on port ${PORT}`, {
+  logger.info(`OptiRev Backend running on port ${PORT}`, {
     environment: process.env.NODE_ENV || "development",
     pid: process.pid,
   });

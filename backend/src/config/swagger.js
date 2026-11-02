@@ -5,10 +5,10 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "AI CRM API",
+      title: "OptiRev API",
       version: "2.0.0",
       description: "Production-ready CRM API with automation, RBAC, and workflow engine",
-      contact: { name: "CRM Team" },
+      contact: { name: "OptiRev Team" },
     },
     servers: [
       { url: process.env.API_URL || "http://localhost:5000", description: "Development" },
@@ -68,7 +68,7 @@ const swaggerSpec = swaggerJsdoc(options);
 const setupSwagger = (app) => {
   app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "AI CRM API Docs",
+    customSiteTitle: "OptiRev API Docs",
   }));
   app.get("/api/docs.json", (req, res) => { res.json(swaggerSpec); });
 };

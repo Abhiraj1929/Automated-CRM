@@ -10,7 +10,7 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { service: "ai-crm" },
+  defaultMeta: { service: "optirev" },
   transports: [
     new winston.transports.File({ filename: path.join(logDir, "error.log"), level: "error", maxsize: 5242880, maxFiles: 5 }),
     new winston.transports.File({ filename: path.join(logDir, "combined.log"), maxsize: 5242880, maxFiles: 5 }),

@@ -48,7 +48,7 @@ export function Footer() {
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-bold tracking-tight text-white">
-                Pulse CRM
+                OptiRev
               </span>
             </Link>
             <p
@@ -115,7 +115,7 @@ export function Footer() {
             className="text-sm"
             style={{ color: "hsl(220, 14%, 45%)" }}
           >
-            &copy; {new Date().getFullYear()} Pulse CRM. All rights reserved.
+            &copy; {new Date().getFullYear()} OptiRev. All rights reserved.
           </p>
           <p
             className="text-sm"

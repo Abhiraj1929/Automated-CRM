@@ -1,5 +1,5 @@
 -- ============================================================
--- AI CRM Database Schema - Run this in Supabase SQL Editor
+-- OptiRev Database Schema - Run this in Supabase SQL Editor
 -- ============================================================
 
 -- 1. Create users table

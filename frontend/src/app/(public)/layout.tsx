@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pulse CRM - AI-Powered Customer Relationship Management",
+  title: "OptiRev - AI-Powered Customer Relationship Management",
   description:
     "Close deals 3x faster with AI lead scoring, dynamic pipelines, and role-based access control.",
 };

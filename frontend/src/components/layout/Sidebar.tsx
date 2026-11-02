@@ -54,7 +54,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
             <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
               <Briefcase className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-base tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>CRM</span>
+            <span className="font-bold text-base tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>OptiRev</span>
           </div>
         )}
         <Button variant="ghost" size="icon" onClick={onToggle} className="h-7 w-7" style={{ color: "hsl(220, 9%, 46%)" }}>

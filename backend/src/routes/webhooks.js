@@ -98,7 +98,7 @@ router.post("/stripe", express.raw({ type: "application/json" }), async (req, re
             try {
               await emailService.sendEmail({
                 to: customerEmail,
-                subject: "Payment Confirmed — Set Up Your Pulse CRM Workspace",
+                subject: "Payment Confirmed — Set Up Your OptiRev Workspace",
                 html: `
                   <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
                     <div style="text-align: center; margin-bottom: 24px;">
@@ -147,13 +147,13 @@ router.post("/stripe", express.raw({ type: "application/json" }), async (req, re
               try {
                 await emailService.sendEmail({
                   to: customerEmail,
-                  subject: "Welcome to Pulse CRM — Set Up Your Workspace",
+                  subject: "Welcome to OptiRev — Set Up Your Workspace",
                   html: `
                     <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
                       <div style="text-align: center; margin-bottom: 24px;">
                         <div style="display: inline-block; width: 48px; height: 48px; background: #2563eb; border-radius: 12px; line-height: 48px; color: white; font-size: 24px;">✓</div>
                       </div>
-                      <h2 style="color: #1a2332; text-align: center;">Welcome to Pulse CRM!</h2>
+                      <h2 style="color: #1a2332; text-align: center;">Welcome to OptiRev!</h2>
                       <p style="color: #555; line-height: 1.6; text-align: center;">
                         Your <strong>${plan_id || "Pro"}</strong> workspace is ready.
                         ${type === "trial" ? `You have a <strong>${trialDays || 7}-day free trial</strong> included.` : ""}

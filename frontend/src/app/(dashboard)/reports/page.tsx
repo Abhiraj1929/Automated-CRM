@@ -42,7 +42,10 @@ const downloadFile = async (url: string, filename: string) => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
 };
 
 const REPORT_CARDS = [
@@ -53,7 +56,7 @@ const REPORT_CARDS = [
     icon: TrendingUp,
     color: "text-blue-600",
     bgColor: "bg-blue-50",
-    endpoint: "/api/reports/pipeline",
+    endpoint: "/reports/pipeline",
   },
   {
     id: "revenue",
@@ -62,7 +65,7 @@ const REPORT_CARDS = [
     icon: BarChart3,
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
-    endpoint: "/api/reports/revenue",
+    endpoint: "/reports/revenue",
   },
   {
     id: "activities",
@@ -71,7 +74,7 @@ const REPORT_CARDS = [
     icon: Activity,
     color: "text-amber-600",
     bgColor: "bg-amber-50",
-    endpoint: "/api/reports/activities",
+    endpoint: "/reports/activities",
   },
   {
     id: "lead-conversion",
@@ -80,7 +83,7 @@ const REPORT_CARDS = [
     icon: Target,
     color: "text-purple-600",
     bgColor: "bg-purple-50",
-    endpoint: "/api/reports/lead-conversion",
+    endpoint: "/reports/lead-conversion",
   },
 ];
 
@@ -125,7 +128,7 @@ export default function ReportsPage() {
   const handleDownload = async (endpoint: string, format: string, name: string) => {
     setDownloading(`${name}-${format}`);
     try {
-      let url = `${API_BASE}${endpoint}?format=${format}`;
+      let url = `${endpoint}?format=${format}`;
       if (endpoint.includes("revenue")) {
         url += `&start_date=${startDate}&end_date=${endDate}`;
       }

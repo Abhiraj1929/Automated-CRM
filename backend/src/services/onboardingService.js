@@ -91,10 +91,10 @@ async function provisionWorkspace({ orgName, email, name, planId, stripeCustomer
   try {
     await emailService.sendEmail({
       to: email,
-      subject: "Welcome to Pulse CRM — Your workspace is ready!",
+      subject: "Welcome to OptiRev — Your workspace is ready!",
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #1a2332;">Welcome to Pulse CRM, ${name}!</h2>
+          <h2 style="color: #1a2332;">Welcome to OptiRev, ${name}!</h2>
           <p style="color: #555; line-height: 1.6;">
             Your <strong>${org.plan}</strong> workspace "<strong>${org.name}</strong>" is now active.
           </p>

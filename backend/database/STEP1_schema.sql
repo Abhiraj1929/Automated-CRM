@@ -1,5 +1,5 @@
 -- ============================================================
--- AI CRM - Business CRM Schema (Salesforce-style)
+-- OptiRev - Business CRM Schema (Salesforce-style)
 -- Run this in Supabase SQL Editor
 -- ============================================================
 

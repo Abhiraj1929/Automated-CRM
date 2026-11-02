@@ -73,7 +73,7 @@ export default function OnboardingPage() {
       <div className="max-w-3xl mx-auto py-12 px-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2" style={{ color: "hsl(220, 13%, 18%)" }}>Welcome to CRM</h1>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: "hsl(220, 13%, 18%)" }}>Welcome to OptiRev</h1>
           <p style={{ color: "hsl(220, 9%, 46%)" }}>Let&apos;s get your workspace set up in 3 quick steps</p>
         </div>
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- AI CRM - Seed Data (Business CRM)
+-- OptiRev - Seed Data (Business CRM)
 -- Run AFTER Step 1 schema
 -- Passwords: Admin123!, Manager123!, Employee123!
 -- ============================================================
@@ -128,9 +128,9 @@ FROM leads l, users u WHERE l.email = 'chris.martinez@newco.com' AND u.email = '
 -- PRODUCTS
 -- ============================================================
 INSERT INTO products (name, code, description, unit_price) VALUES
-  ('CRM Starter', 'CRM-START', 'Basic CRM with 5 users', 49.00),
-  ('CRM Professional', 'CRM-PRO', 'Full CRM with 25 users', 149.00),
-  ('CRM Enterprise', 'CRM-ENT', 'Unlimited CRM with API access', 349.00),
+  ('OptiRev Starter', 'OPTI-START', 'Basic CRM with 5 users', 49.00),
+  ('OptiRev Professional', 'OPTI-PRO', 'Full CRM with 25 users', 149.00),
+  ('OptiRev Enterprise', 'OPTI-ENT', 'Unlimited CRM with API access', 349.00),
   ('AI Add-on', 'AI-ADD', 'AI lead scoring and insights', 99.00),
   ('Analytics Module', 'ANALYTICS', 'Advanced reporting and dashboards', 79.00),
   ('Premium Support', 'SUP-PREM', '24/7 priority support', 199.00);

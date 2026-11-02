@@ -6,9 +6,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AI CRM - Enterprise Customer Relationship Management",
+  title: "OptiRev - Enterprise Customer Relationship Management",
   description:
-    "AI-powered CRM system with intelligent lead scoring and pipeline management",
+    "OptiRev - AI-powered CRM system with intelligent lead scoring and pipeline management",
 };
 
 export default function RootLayout({

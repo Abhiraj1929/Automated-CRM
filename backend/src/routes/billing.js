@@ -467,7 +467,7 @@ router.get("/verify-session", async (req, res) => {
           id: session_id,
           status: "complete",
           payment_status: "paid",
-          customer_email: "dev@pulse.local",
+          customer_email: "dev@optirev.local",
           plan_id: "pro",
           billing: "monthly",
           trialDays: 7,
@@ -558,7 +558,7 @@ router.post("/setup-password", async (req, res) => {
         .limit(1)
         .single();
       orgId = recentOrg?.id;
-      customerEmail = "dev@pulse.local";
+      customerEmail = "dev@optirev.local";
     }
 
     if (!orgId) {

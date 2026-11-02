@@ -124,7 +124,7 @@ function SignupContent() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
             <Sparkles className="h-5 w-5 text-white" />
           </div>
-          <span className="text-2xl font-bold tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Pulse CRM</span>
+          <span className="text-2xl font-bold tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>OptiRev</span>
         </Link>
 
         <div className="rounded-xl p-8 shadow-sm" style={{ backgroundColor: "white", border: "1px solid hsl(220, 13%, 91%)" }}>

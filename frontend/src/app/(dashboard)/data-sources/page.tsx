@@ -440,7 +440,7 @@ export default function DataSourcesPage() {
                 </div>
 
                 <div className="rounded-lg p-3 mb-4 text-sm" style={{ backgroundColor: "hsl(221, 83%, 53% / 0.06)", border: "1px solid hsl(221, 83%, 53% / 0.15)", color: "hsl(221, 83%, 53%)" }}>
-                  Enter your <strong>{selectedPlatform.name}</strong> login credentials. CRM will use them to fetch leads automatically.
+                  Enter your <strong>{selectedPlatform.name}</strong> login credentials. OptiRev will use them to fetch leads automatically.
                 </div>
 
                 <div className="space-y-4">

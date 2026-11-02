@@ -127,11 +127,11 @@ class InvitationService {
     try {
       await emailService.sendEmail({
         to: email,
-        subject: `You're invited to join ${org?.name || "CRM"} on Pulse`,
+        subject: `You're invited to join ${org?.name || "OptiRev"} on OptiRev`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #3b82f6;">You're Invited!</h2>
-            <p><strong>${inviter?.name || "Admin"}</strong> has invited you to join <strong>${org?.name || "CRM"}</strong> on Pulse CRM.</p>
+            <p><strong>${inviter?.name || "Admin"}</strong> has invited you to join <strong>${org?.name || "OptiRev"}</strong> on OptiRev.</p>
             <p>Your role: <strong>${role || "Employee"}</strong></p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${inviteUrl}" style="background-color: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>
@@ -344,11 +344,11 @@ class InvitationService {
     try {
       await emailService.sendEmail({
         to: inv.email,
-        subject: `Reminder: Join ${inv.organization?.name || "CRM"} on Pulse`,
+        subject: `Reminder: Join ${inv.organization?.name || "OptiRev"} on OptiRev`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #3b82f6;">Invitation Reminder</h2>
-            <p>You were invited to join <strong>${inv.organization?.name || "CRM"}</strong> on Pulse CRM.</p>
+            <p>You were invited to join <strong>${inv.organization?.name || "OptiRev"}</strong> on OptiRev.</p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${inviteUrl}" style="background-color: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>
             </div>

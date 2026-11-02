@@ -51,7 +51,7 @@ function SuccessContent() {
           id: sessionId,
           status: "complete",
           payment_status: "paid",
-          customer_email: "dev@pulse.local",
+          customer_email: "dev@optirev.local",
           plan_id: "pro",
           billing: "monthly",
           trialDays: 7,
@@ -195,7 +195,7 @@ function SuccessContent() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
-              <span className="text-lg font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>Pulse CRM</span>
+              <span className="text-lg font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>OptiRev</span>
             </Link>
             <Badge className="bg-green-100 text-green-700">
               <CheckCircle className="h-3 w-3 mr-1" />Payment Confirmed

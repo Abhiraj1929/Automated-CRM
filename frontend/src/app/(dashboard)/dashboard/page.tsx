@@ -19,7 +19,7 @@ export default function DashboardPage() {
     getDashboardStats().then((r) => { if (r.success && r.data) setStats(r.data); }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (<><Header title="Dashboard" subtitle="Overview of your CRM" /><div className="flex items-center justify-center h-[calc(100vh-4rem)]"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div></>);
+  if (loading) return (<><Header title="Dashboard" subtitle="Overview of your OptiRev workspace" /><div className="flex items-center justify-center h-[calc(100vh-4rem)]"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div></>);
   if (!stats) return null;
 
   const statCards = [
@@ -39,7 +39,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Header title="Dashboard" subtitle="Overview of your CRM" />
+      <Header title="Dashboard" subtitle="Overview of your OptiRev workspace" />
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((stat) => (

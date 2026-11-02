@@ -50,7 +50,7 @@ export function CTABanner() {
               className="mx-auto mt-4 max-w-lg text-lg"
               style={{ color: "hsl(220, 14%, 70%)" }}
             >
-              Join 200+ sales teams using Pulse CRM to close deals faster with
+              Join 200+ sales teams using OptiRev to close deals faster with
               AI-powered lead scoring.
             </p>
 

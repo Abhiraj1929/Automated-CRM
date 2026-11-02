@@ -435,7 +435,7 @@ export default function UserManagementPage() {
             <p className="text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>
               {showDeactivate?.role === "manager"
                 ? "This manager will lose access to all team management features and their direct reports will be unassigned."
-                : "This employee will no longer be able to log in or access the CRM."}
+                : "This employee will no longer be able to log in or access OptiRev."}
             </p>
             <p className="text-sm font-medium" style={{ color: "hsl(220, 13%, 18%)" }}>
               Are you sure you want to remove <strong>{showDeactivate?.name}</strong> from your organization?

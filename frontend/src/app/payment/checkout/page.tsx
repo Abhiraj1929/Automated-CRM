@@ -263,7 +263,7 @@ function CheckoutContent() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <span className="text-lg font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>Pulse CRM</span>
+            <span className="text-lg font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>OptiRev</span>
           </Link>
           <div className="flex items-center gap-3">
             <Lock className="h-4 w-4" style={{ color: "hsl(160, 60%, 40%)" }} />

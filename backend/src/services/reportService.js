@@ -8,13 +8,24 @@ class ReportService {
   async generatePipelineReport({ format = 'pdf' } = {}) {
     const { data: opps } = await supabase
       .from('opportunities')
-      .select('*, account:accounts(name), owner:users(name)')
+      .select('*, account:accounts(name), owner:users!opportunities_owner_id_fkey(name)')
       .order('created_at', { ascending: false });
 
     const stats = this._calculatePipelineStats(opps || []);
+    const flat = (opps || []).map(o => ({
+      id: o.id,
+      name: o.name,
+      stage: o.stage,
+      amount: o.amount,
+      probability: o.probability,
+      close_date: o.close_date,
+      account_name: o.account?.name || '',
+      owner_name: o.owner?.name || '',
+      created_at: o.created_at,
+    }));
 
     if (format === 'pdf') {
-      return this._generatePDF('Pipeline Report', stats, opps || []);
+      return this._generatePDF('Pipeline Report', stats, flat);
     }
 
     if (format === 'xlsx') {
@@ -26,7 +37,7 @@ class ReportService {
         { Metric: 'Win Rate', Value: `${stats.winRate}%` },
         { Metric: 'Average Deal Size', Value: `$${stats.avgDealSize.toLocaleString()}` },
       ]);
-      wb.Sheets['Opportunities'] = XLSX.utils.json_to_sheet(opps || []);
+      wb.Sheets['Opportunities'] = XLSX.utils.json_to_sheet(flat.length > 0 ? flat : [{ Message: 'No opportunities found' }]);
       XLSX.utils.book_append_sheet(wb, wb.Sheets['Summary'], 'Summary');
       XLSX.utils.book_append_sheet(wb, wb.Sheets['Opportunities'], 'Opportunities');
       const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
@@ -34,7 +45,7 @@ class ReportService {
     }
 
     const parser = new Parser();
-    const csv = parser.parse(opps || []);
+    const csv = parser.parse(flat.length > 0 ? flat : [{ Message: 'No opportunities found' }]);
     return { data: csv, contentType: 'text/csv', filename: 'pipeline_report.csv' };
   }
 
@@ -87,7 +98,7 @@ class ReportService {
   async generateActivityReport({ format = 'pdf' } = {}) {
     const { data: activities } = await supabase
       .from('activities')
-      .select('*, assignee:users(name)')
+      .select('*, owner:users!activities_owner_id_fkey(name)')
       .order('created_at', { ascending: false });
 
     const stats = {
@@ -97,6 +108,18 @@ class ReportService {
       overdue: (activities || []).filter(a => a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed').length,
     };
 
+    const flat = (activities || []).map(a => ({
+      id: a.id,
+      type: a.type,
+      subject: a.subject,
+      description: a.description,
+      status: a.status,
+      priority: a.priority,
+      due_date: a.due_date,
+      owner_name: a.owner?.name || '',
+      created_at: a.created_at,
+    }));
+
     if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
       wb.Sheets['Summary'] = XLSX.utils.json_to_sheet([
@@ -105,8 +128,7 @@ class ReportService {
         { Metric: 'Pending', Value: stats.pending },
         { Metric: 'Overdue', Value: stats.overdue },
       ]);
-      const flat = (activities || []).map(a => ({ ...a, assignee: a.assignee?.name || '' }));
-      wb.Sheets['Activities'] = XLSX.utils.json_to_sheet(flat);
+      wb.Sheets['Activities'] = XLSX.utils.json_to_sheet(flat.length > 0 ? flat : [{ Message: 'No activities found' }]);
       XLSX.utils.book_append_sheet(wb, wb.Sheets['Summary'], 'Summary');
       XLSX.utils.book_append_sheet(wb, wb.Sheets['Activities'], 'Activities');
       const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
@@ -114,8 +136,7 @@ class ReportService {
     }
 
     const parser = new Parser();
-    const flat = (activities || []).map(a => ({ ...a, assignee_name: a.assignee?.name || '', assignee: undefined }));
-    const csv = parser.parse(flat);
+    const csv = parser.parse(flat.length > 0 ? flat : [{ Message: 'No activities found' }]);
     return { data: csv, contentType: 'text/csv', filename: 'activity_report.csv' };
   }
 

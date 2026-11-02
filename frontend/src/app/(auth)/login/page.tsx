@@ -62,7 +62,7 @@ function LoginForm() {
           <div className="flex items-center justify-center w-10 h-10 rounded-xl" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-2xl tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Pulse CRM</span>
+          <span className="font-bold text-2xl tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>OptiRev</span>
         </div>
 
         <div className="rounded-xl p-8 shadow-sm" style={{ backgroundColor: "white", border: "1px solid hsl(220, 13%, 91%)" }}>
@@ -125,6 +125,36 @@ function LoginForm() {
               )}
             </Button>
           </form>
+
+          {/* Quick Demo Logins */}
+          <div className="mt-6 pt-4 border-t" style={{ borderColor: "hsl(220, 13%, 91%)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2 text-center" style={{ color: "hsl(220, 9%, 46%)" }}>
+              Quick Demo Accounts
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => { setEmail("admin@crm.com"); setPassword("Admin123!"); }}
+                className="px-2 py-1.5 text-xs font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors text-center"
+              >
+                Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail("marcus@company.com"); setPassword("Manager123!"); }}
+                className="px-2 py-1.5 text-xs font-medium rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition-colors text-center"
+              >
+                Manager
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEmail("sarah@company.com"); setPassword("Employee123!"); }}
+                className="px-2 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors text-center"
+              >
+                Employee
+              </button>
+            </div>
+          </div>
 
           <p className="text-center text-sm mt-5" style={{ color: "hsl(220, 9%, 46%)" }}>
             Don&apos;t have an account?{" "}

@@ -79,7 +79,7 @@ function ConfirmationContent() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: "hsl(221, 83%, 53%)" }}>
             <Sparkles className="h-5 w-5 text-white" />
           </div>
-          <span className="text-2xl font-bold tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Pulse CRM</span>
+          <span className="text-2xl font-bold tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>OptiRev</span>
         </div>
 
         <div className="rounded-xl p-8 shadow-sm" style={{ backgroundColor: "white", border: "1px solid hsl(220, 13%, 91%)" }}>
@@ -136,7 +136,7 @@ function ConfirmationContent() {
 
         <p className="mt-6 text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>
           Need help?{" "}
-          <a href="mailto:support@pulsecrm.com" className="font-medium text-blue-600 hover:underline">Contact Support</a>
+          <a href="mailto:support@optirev.com" className="font-medium text-blue-600 hover:underline">Contact Support</a>
         </p>
       </div>
     </div>

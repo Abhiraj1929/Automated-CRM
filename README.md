@@ -1,4 +1,4 @@
-# AI CRM - Enterprise Customer Relationship Management
+# OptiRev - Enterprise Customer Relationship Management
 
 An AI-powered CRM system with intelligent lead scoring, pipeline management, and modern UI inspired by Salesforce and Frappe CRM.
 
@@ -15,7 +15,7 @@ An AI-powered CRM system with intelligent lead scoring, pipeline management, and
 ## Project Structure
 
 ```
-ai-crm-project/
+optirev/
 ├── frontend/          # Next.js application
 │   ├── src/
 │   │   ├── app/       # App Router pages

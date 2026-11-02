@@ -7,8 +7,8 @@ import { Inter } from "next/font/google";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AI CRM - Login",
-  description: "Login to your CRM account",
+  title: "OptiRev - Login",
+  description: "Login to your OptiRev account",
 };
 
 export default function AuthLayout({

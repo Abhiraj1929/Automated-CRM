@@ -59,7 +59,7 @@ export function SuperAdminSidebar({ collapsed = false, onToggle }: SidebarProps)
               <span className="font-bold text-sm text-white block leading-tight">
                 Platform Admin
               </span>
-              <span className="text-[10px] text-gray-400 block">CRM Owner</span>
+              <span className="text-[10px] text-gray-400 block">OptiRev Owner</span>
             </div>
           </div>
         )}
@@ -120,7 +120,7 @@ export function SuperAdminSidebar({ collapsed = false, onToggle }: SidebarProps)
       {/* Divider */}
       <div className="mx-3 mb-2" style={{ borderTop: "1px solid hsl(220, 10%, 20%)" }} />
 
-      {/* Back to CRM */}
+      {/* Back to OptiRev */}
       <div className="px-2 mb-2">
         <button
           onClick={() => window.history.back()}
@@ -139,7 +139,7 @@ export function SuperAdminSidebar({ collapsed = false, onToggle }: SidebarProps)
           }}
         >
           <Users className="h-[18px] w-[18px] shrink-0" />
-          {!collapsed && <span>Back to CRM</span>}
+          {!collapsed && <span>Back to OptiRev</span>}
         </button>
       </div>
 

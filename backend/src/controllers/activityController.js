@@ -51,11 +51,11 @@ const getActivity = async (req, res, next) => {
 
 const createActivity = async (req, res, next) => {
   try {
-    const { type, subject, description, status, priority, due_date, duration_minutes, who_id, what_id, who_type, what_type } = req.body;
+    const { type, subject, description, status, priority, due_date, duration_minutes, who_id, what_id, who_type, what_type, owner_id } = req.body;
 
     const { data, error } = await supabase
       .from("activities")
-      .insert({ type, subject, description, status: status || "open", priority: priority || "normal", due_date, duration_minutes, who_id, what_id, who_type, what_type, owner_id: req.user.id, created_by: req.user.id })
+      .insert({ type, subject, description, status: status || "open", priority: priority || "normal", due_date, duration_minutes, who_id, what_id, who_type, what_type, owner_id: owner_id || req.user.id, created_by: req.user.id })
       .select("*, owner:users!activities_owner_id_fkey(id, name)")
       .single();
 

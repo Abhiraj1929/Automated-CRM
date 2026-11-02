@@ -20,7 +20,7 @@ from .models.train_vertical import train_tenant_model, train_all_verticals
 # App
 # ============================================================
 app = FastAPI(
-    title="Pulse CRM Lead Scoring API",
+    title="OptiRev Lead Scoring API",
     description="Multi-tenant ML lead scoring engine supporting B2B, Real Estate, E-Commerce, and Professional Services verticals.",
     version="4.0.0",
 )

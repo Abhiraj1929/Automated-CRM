@@ -43,13 +43,13 @@ function PlatformLoginForm({ onLogin }: { onLogin: (email: string, password: str
           </div>
           <div>
             <span className="block text-2xl font-bold tracking-tight" style={{ color: "hsl(220, 13%, 18%)" }}>Platform Admin</span>
-            <span className="block text-xs font-medium" style={{ color: "hsl(220, 9%, 46%)" }}>CRM Owner Access Only</span>
+            <span className="block text-xs font-medium" style={{ color: "hsl(220, 9%, 46%)" }}>OptiRev Owner Access Only</span>
           </div>
         </div>
         <div className="rounded-xl p-8 shadow-sm" style={{ backgroundColor: "white", border: "1px solid hsl(220, 13%, 91%)" }}>
           <div className="mb-6 text-center">
             <h2 className="text-xl font-semibold" style={{ color: "hsl(220, 13%, 18%)" }}>Sign in as Platform Owner</h2>
-            <p className="mt-1 text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>This login is restricted to the CRM platform administrator.</p>
+            <p className="mt-1 text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>This login is restricted to the OptiRev platform administrator.</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -61,7 +61,7 @@ function PlatformLoginForm({ onLogin }: { onLogin: (email: string, password: str
               <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "hsl(220, 9%, 46%)" }} />
-                <input id="email" type="email" placeholder="owner@pulsecrm.com" value={email} onChange={(e) => setEmail(e.target.value)} required
+                <input id="email" type="email" placeholder="owner@optirev.com" value={email} onChange={(e) => setEmail(e.target.value)} required
                   className="h-10 w-full rounded-lg border bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   style={{ borderColor: "hsl(220, 13%, 91%)", color: "hsl(220, 13%, 18%)" }} />
               </div>
@@ -79,6 +79,17 @@ function PlatformLoginForm({ onLogin }: { onLogin: (email: string, password: str
               {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>) : ("Sign In to Platform Admin")}
             </Button>
           </form>
+
+          {/* Quick Demo Fill */}
+          <div className="mt-5 pt-4 border-t text-center" style={{ borderColor: "hsl(220, 13%, 91%)" }}>
+            <button
+              type="button"
+              onClick={() => { setEmail("admin@crm.com"); setPassword("Admin123!"); }}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              Fill Demo Platform Admin Credentials
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -167,7 +178,7 @@ function DashboardView() {
           <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: "hsl(220, 13%, 18%)" }}>
             <ShieldCheck className="h-6 w-6 text-blue-600" />Platform Overview
           </h1>
-          <p className="text-sm mt-1" style={{ color: "hsl(220, 9%, 46%)" }}>Global overview of all CRM tenants, billing, and AI usage.</p>
+          <p className="text-sm mt-1" style={{ color: "hsl(220, 9%, 46%)" }}>Global overview of all OptiRev tenants, billing, and AI usage.</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchData(pagination.page, search)}>
           <RefreshCw className="h-4 w-4 mr-1.5" />Refresh

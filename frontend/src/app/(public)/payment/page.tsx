@@ -93,7 +93,7 @@ function PaymentContent() {
               Close deals <span className="text-blue-600">3x faster</span> with AI
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg" style={{ color: "hsl(220, 9%, 46%)" }}>
-              Pulse CRM uses machine learning to score leads, predict conversions, and automate your sales pipeline.
+              OptiRev uses machine learning to score leads, predict conversions, and automate your sales pipeline.
               Enterprise-grade security with RBAC, audit trails, and real-time analytics.
             </p>
             <div className="mt-8 flex items-center justify-center gap-4">
