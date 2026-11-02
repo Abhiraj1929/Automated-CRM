@@ -375,7 +375,7 @@ export default function UserManagementPage() {
       {/* ============ EDIT USER DIALOG ============ */}
       <Dialog open={!!showEdit} onOpenChange={() => setShowEdit(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Edit User</DialogTitle><DialogDescription>Update {showEdit?.name}'s details</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Edit User</DialogTitle><DialogDescription>Update {showEdit?.name}&apos;s details</DialogDescription></DialogHeader>
           <form onSubmit={handleEdit} className="space-y-4 mt-4">
             <div><Label>Name</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required className="mt-1.5" /></div>
             <div>

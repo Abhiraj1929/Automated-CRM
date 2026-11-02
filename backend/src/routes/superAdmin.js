@@ -376,14 +376,14 @@ router.post("/organizations/:id/sync-subscription", async (req, res, next) => {
     // Map Stripe status to our plan status
     let newStatus = org.status;
     if (stripeStatus) {
-      if (stripeStatus.status === "active" || stripeStatus.status === "trialing") {
+      if (stripeStatus.status === "active") {
         newStatus = "active";
+      } else if (stripeStatus.status === "trialing") {
+        newStatus = "trial";
       } else if (stripeStatus.status === "past_due") {
         newStatus = "active"; // still allow access
       } else if (stripeStatus.status === "canceled" || stripeStatus.status === "unpaid") {
         newStatus = "cancelled";
-      } else if (stripeStatus.status === "trialing") {
-        newStatus = "trial";
       }
     }
 

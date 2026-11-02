@@ -379,7 +379,7 @@ export default function CampaignDetailPage() {
             <DialogContent className="max-w-lg max-h-[80vh]">
               <DialogHeader>
                 <DialogTitle>Link Leads to Campaign</DialogTitle>
-                <DialogDescription>Select leads to associate with "{campaign.name}"</DialogDescription>
+                <DialogDescription>Select leads to associate with &quot;{campaign.name}&quot;</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <Input placeholder="Search leads..." value={leadSearch} onChange={(e) => setLeadSearch(e.target.value)} />
