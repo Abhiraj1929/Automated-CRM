@@ -194,10 +194,10 @@ function PaymentContent() {
                   {id === "pro" && <Badge className="mb-4 bg-blue-600 text-white text-xs">Most Popular</Badge>}
                   <h3 className="text-xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>{p.name}</h3>
                   <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>${pPrice}</span>
+                    <span className="text-4xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>₹{pPrice}</span>
                     <span className="text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>/mo</span>
                   </div>
-                  {billing === "annual" && <p className="mt-1 text-xs text-green-600 font-medium">Save ${(p.price - p.annual) * 12}/year</p>}
+                  {billing === "annual" && <p className="mt-1 text-xs text-green-600 font-medium">Save ₹{(p.price - p.annual) * 12}/year</p>}
                   <ul className="mt-6 space-y-3">
                     {p.features.map((f) => (
                       <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>
@@ -221,7 +221,7 @@ function PaymentContent() {
               <h3 className="mb-4 text-lg font-semibold" style={{ color: "hsl(220, 13%, 18%)" }}>Order Summary</h3>
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-sm" style={{ color: "hsl(220, 9%, 46%)" }}>{planInfo.name} Plan ({billing})</span>
-                <span className="text-2xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>${price}/mo</span>
+                <span className="text-2xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>₹{price}/mo</span>
               </div>
 
               {error && (
@@ -232,7 +232,7 @@ function PaymentContent() {
                 {processing ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>
                 ) : (
-                  <><CreditCard className="mr-2 h-4 w-4" />Start Free Trial — ${price}/mo</>
+                  <><CreditCard className="mr-2 h-4 w-4" />Start Free Trial — ₹{price}/mo</>
                 )}
               </Button>
 

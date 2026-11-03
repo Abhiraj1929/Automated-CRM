@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   ShieldCheck, Mail, Lock, AlertCircle, Loader2,
-  DollarSign, Users, Clock, Cpu, TrendingUp,
+  IndianRupee, Users, Clock, Cpu, TrendingUp,
   RefreshCw, Search, ChevronLeft, ChevronRight,
   MoreHorizontal, CheckCircle, Ban, Gift, Activity, CreditCard,
 } from "lucide-react";
@@ -190,9 +190,9 @@ function DashboardView() {
           <Card><CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div><p className="text-xs font-medium uppercase tracking-wider" style={{ color: "hsl(220, 9%, 46%)" }}>Monthly Recurring Revenue</p>
-              <p className="text-3xl font-bold mt-1" style={{ color: "hsl(220, 13%, 18%)" }}>${analytics.mrr.toLocaleString()}</p></div>
+              <p className="text-3xl font-bold mt-1" style={{ color: "hsl(220, 13%, 18%)" }}>₹{analytics.mrr.toLocaleString("en-IN")}</p></div>
               <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: "hsl(160, 60%, 40% / 0.08)" }}>
-                <DollarSign className="h-5 w-5" style={{ color: "hsl(160, 60%, 40%)" }} /></div>
+                <IndianRupee className="h-5 w-5" style={{ color: "hsl(160, 60%, 40%)" }} /></div>
             </div>
             <p className="text-xs mt-2" style={{ color: "hsl(220, 9%, 46%)" }}>{analytics.active_paid} paying clients</p>
           </CardContent></Card>
@@ -273,7 +273,7 @@ function DashboardView() {
                           <p className="text-[11px]" style={{ color: "hsl(220, 9%, 60%)" }}>Since {new Date(org.created_at).toLocaleDateString()}</p>
                         </td>
                         <td className="px-4 py-3"><Badge variant="secondary" className="text-xs font-medium">{planLabels[org.plan] || org.plan}
-                          {planPrices[org.plan] && <span className="ml-1 text-[10px]" style={{ color: "hsl(220, 9%, 55%)" }}>${planPrices[org.plan]}/mo</span>}</Badge></td>
+                          {planPrices[org.plan] && <span className="ml-1 text-[10px]" style={{ color: "hsl(220, 9%, 55%)" }}>₹{planPrices[org.plan]}/mo</span>}</Badge></td>
                         <td className="px-4 py-3">{statusBadge(org.payment_status, org.trial_days_left)}</td>
                         <td className="px-4 py-3 min-w-[160px]">
                           <div className="flex items-center gap-2">

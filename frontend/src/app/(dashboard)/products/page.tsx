@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getProducts, createProduct, updateProduct, deleteProduct, getProductStats } from "@/lib/api";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Product } from "@/types/crm";
-import { Plus, Search, Loader2, X, Package, DollarSign, BarChart3 } from "lucide-react";
+import { Plus, Search, Loader2, X, Package, IndianRupee, BarChart3 } from "lucide-react";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -61,7 +61,7 @@ export default function ProductsPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card><CardContent className="p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center"><Package className="h-5 w-5 text-primary" /></div><div><p className="text-sm text-muted-foreground">Products</p><p className="text-2xl font-bold">{stats.totalProducts}</p></div></CardContent></Card>
             <Card><CardContent className="p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center"><BarChart3 className="h-5 w-5 text-emerald-500" /></div><div><p className="text-sm text-muted-foreground">Active</p><p className="text-2xl font-bold">{stats.activeProducts}</p></div></CardContent></Card>
-            <Card><CardContent className="p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center"><DollarSign className="h-5 w-5 text-amber-500" /></div><div><p className="text-sm text-muted-foreground">Total Revenue</p><p className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</p></div></CardContent></Card>
+            <Card><CardContent className="p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center"><IndianRupee className="h-5 w-5 text-amber-500" /></div><div><p className="text-sm text-muted-foreground">Total Revenue</p><p className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</p></div></CardContent></Card>
           </div>
         )}
         <div className="flex items-center justify-between">

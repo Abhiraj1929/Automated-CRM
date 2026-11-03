@@ -2,9 +2,6 @@
 // Auth Layout - Minimal layout for login/register pages
 // ============================================================
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "OptiRev - Login",
@@ -17,7 +14,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={inter.className}>
+    <div className="font-sans antialiased">
       {children}
     </div>
   );

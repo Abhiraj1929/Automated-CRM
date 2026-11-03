@@ -10,7 +10,7 @@ import { getOpportunity, updateOpportunity, updateOpportunityStage, deleteOpport
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Opportunity } from "@/types/crm";
 import { PIPELINE_STAGES } from "@/types/crm";
-import { ArrowLeft, Loader2, DollarSign, Calendar, Building2, User, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, IndianRupee, Calendar, Building2, User, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 
 const STAGE_COLORS: Record<string, string> = {
   prospecting: "bg-blue-100 text-blue-700",
@@ -83,7 +83,7 @@ export default function OpportunityDetailPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2"><Badge className={`${STAGE_COLORS[opp.stage]}`}>{PIPELINE_STAGES.find((s) => s.id === opp.stage)?.label || opp.stage}</Badge></div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="flex items-center gap-2 text-sm"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-lg font-semibold">{formatCurrency(opp.amount)}</span></div>
+                    <div className="flex items-center gap-2 text-sm"><IndianRupee className="h-4 w-4 text-muted-foreground" /><span className="text-lg font-semibold">{formatCurrency(opp.amount)}</span></div>
                     {opp.close_date && <div className="flex items-center gap-2 text-sm"><Calendar className="h-4 w-4 text-muted-foreground" />Close: {opp.close_date}</div>}
                     {opp.account && <div className="flex items-center gap-2 text-sm cursor-pointer hover:underline" onClick={() => router.push(`/accounts/${opp.account_id}`)}><Building2 className="h-4 w-4 text-muted-foreground" />{opp.account.name}</div>}
                     {opp.contact && <div className="flex items-center gap-2 text-sm cursor-pointer hover:underline" onClick={() => router.push(`/contacts/${opp.contact_id}`)}><User className="h-4 w-4 text-muted-foreground" />{opp.contact.first_name} {opp.contact.last_name}</div>}

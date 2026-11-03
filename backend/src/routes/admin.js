@@ -323,7 +323,7 @@ router.get("/activity", async (req, res, next) => {
       ...(recentOpps || []).map((o) => ({
         type: "opportunity",
         icon: "💰",
-        text: `${o.name} — $${(Number(o.amount) || 0).toLocaleString()}`,
+        text: `${o.name} — ₹${(Number(o.amount) || 0).toLocaleString("en-IN")}`,
         detail: `Stage: ${o.stage}`,
         status: o.stage,
         date: o.updated_at,

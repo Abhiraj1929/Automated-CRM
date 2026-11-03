@@ -10,7 +10,7 @@ import { getCampaigns, createCampaign, updateCampaign, deleteCampaign } from "@/
 import { formatCurrency } from "@/lib/utils";
 import type { Campaign } from "@/types/crm";
 import { CAMPAIGN_TYPES, CAMPAIGN_STATUSES } from "@/types/crm";
-import { Plus, Search, Loader2, X, Megaphone, DollarSign, TrendingUp, Users } from "lucide-react";
+import { Plus, Search, Loader2, X, Megaphone, IndianRupee, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 
 const STATUS_COLORS: Record<string, string> = { planning: "bg-slate-100 text-slate-700", active: "bg-emerald-100 text-emerald-700", paused: "bg-amber-100 text-amber-700", completed: "bg-blue-100 text-blue-700", cancelled: "bg-red-100 text-red-700" };
@@ -88,7 +88,7 @@ export default function CampaignsPage() {
             <div><p className="text-xs" style={{ color: "hsl(220, 9%, 46%)" }}>Converted</p><p className="text-xl font-bold">{totalConverted}</p></div>
           </CardContent></Card>
           <Card><CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "hsl(142, 71%, 45%, 0.1)" }}><DollarSign className="h-5 w-5" style={{ color: "hsl(142, 71%, 45%)" }} /></div>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: "hsl(142, 71%, 45%, 0.1)" }}><IndianRupee className="h-5 w-5" style={{ color: "hsl(142, 71%, 45%)" }} /></div>
             <div><p className="text-xs" style={{ color: "hsl(220, 9%, 46%)" }}>Pipeline</p><p className="text-xl font-bold">{formatCurrency(totalPipeline)}</p></div>
           </CardContent></Card>
         </div>

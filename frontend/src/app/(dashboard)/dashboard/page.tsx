@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   Trophy,
   Building2,
@@ -85,7 +85,7 @@ export default function DashboardPage() {
       value: formatCurrency(stats.totalWonValue || 0),
       subtitle: `${stats.winRate || 0}% overall win rate`,
       badge: "Won Deals",
-      icon: DollarSign,
+      icon: IndianRupee,
       trend: "Realized",
       trendPositive: true,
     },

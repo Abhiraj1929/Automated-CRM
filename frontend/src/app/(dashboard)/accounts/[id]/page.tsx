@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getAccount, updateAccount, deleteAccount, getContacts } from "@/lib/api";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Account, Contact } from "@/types/crm";
-import { ArrowLeft, Loader2, Mail, Phone, Building2, Globe, MapPin, Users, DollarSign, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, Phone, Building2, Globe, MapPin, Users, IndianRupee, Pencil, Trash2 } from "lucide-react";
 
 export default function AccountDetailPage() {
   const router = useRouter();
@@ -77,7 +77,7 @@ export default function AccountDetailPage() {
                     {account.phone && <div className="flex items-center gap-2 text-sm"><Phone className="h-4 w-4 text-muted-foreground" />{account.phone}</div>}
                     {account.website && <div className="flex items-center gap-2 text-sm"><Globe className="h-4 w-4 text-muted-foreground" />{account.website}</div>}
                     {(account.city || account.state || account.country) && <div className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4 text-muted-foreground" />{[account.city, account.state, account.country].filter(Boolean).join(", ")}</div>}
-                    {account.annual_revenue && <div className="flex items-center gap-2 text-sm"><DollarSign className="h-4 w-4 text-muted-foreground" />{formatCurrency(account.annual_revenue)}</div>}
+                    {account.annual_revenue && <div className="flex items-center gap-2 text-sm"><IndianRupee className="h-4 w-4 text-muted-foreground" />{formatCurrency(account.annual_revenue)}</div>}
                     {account.number_of_employees && <div className="flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" />{account.number_of_employees.toLocaleString()} employees</div>}
                   </div>
                   {account.description && <p className="text-sm text-muted-foreground mt-2">{account.description}</p>}

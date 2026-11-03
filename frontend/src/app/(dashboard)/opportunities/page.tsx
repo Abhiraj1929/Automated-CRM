@@ -9,7 +9,7 @@ import { getOpportunities, updateOpportunityStage, getPipelineStats } from "@/li
 import { formatCurrency } from "@/lib/utils";
 import type { Opportunity, KanbanColumn } from "@/types/crm";
 import { PIPELINE_STAGES } from "@/types/crm";
-import { Loader2, GripVertical, DollarSign, Building2 } from "lucide-react";
+import { Loader2, GripVertical, IndianRupee, Building2 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 
@@ -96,7 +96,7 @@ export default function OpportunitiesPage() {
                                       </div>
                                       <h4 className="font-medium text-sm mb-1">{opp.name}</h4>
                                       {opp.account && <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2"><Building2 className="h-3 w-3" /><span>{opp.account.name}</span></div>}
-                                      <div className="flex items-center gap-1 text-sm font-semibold"><DollarSign className="h-3 w-3" /><span>{formatCurrency(opp.amount)}</span></div>
+                                      <div className="flex items-center gap-1 text-sm font-semibold"><IndianRupee className="h-3 w-3" /><span>{formatCurrency(opp.amount)}</span></div>
                                       {opp.close_date && <p className="text-[10px] text-muted-foreground mt-2">Close: {opp.close_date}</p>}
                                     </CardContent>
                                   </Card>

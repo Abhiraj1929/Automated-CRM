@@ -129,7 +129,7 @@ function CheckoutContent() {
                   className="text-2xl font-bold"
                   style={{ color: "hsl(220, 13%, 18%)" }}
                 >
-                  ${price}
+                  ₹{price}
                 </p>
                 <p
                   className="text-sm"
@@ -141,7 +141,7 @@ function CheckoutContent() {
             </div>
             {isAnnual && (
               <Badge className="mt-2 bg-green-100 text-green-700 text-xs">
-                You save ${(plan.price - plan.annual) * 12}/year
+                You save ₹{(plan.price - plan.annual) * 12}/year
               </Badge>
             )}
           </div>
@@ -192,7 +192,7 @@ function CheckoutContent() {
                 Redirecting to Stripe...
               </>
             ) : (
-              `Start Free Trial — $${price}/mo`
+              `Start Free Trial — ₹${price}/mo`
             )}
           </Button>
 

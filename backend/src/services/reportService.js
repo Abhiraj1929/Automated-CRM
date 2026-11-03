@@ -32,10 +32,10 @@ class ReportService {
       const wb = XLSX.utils.book_new();
       wb.Sheets['Summary'] = XLSX.utils.json_to_sheet([
         { Metric: 'Total Opportunities', Value: stats.totalOpps },
-        { Metric: 'Total Pipeline Value', Value: `$${stats.totalValue.toLocaleString()}` },
-        { Metric: 'Won Revenue', Value: `$${stats.wonValue.toLocaleString()}` },
+        { Metric: 'Total Pipeline Value', Value: `₹${stats.totalValue.toLocaleString('en-IN')}` },
+        { Metric: 'Won Revenue', Value: `₹${stats.wonValue.toLocaleString('en-IN')}` },
         { Metric: 'Win Rate', Value: `${stats.winRate}%` },
-        { Metric: 'Average Deal Size', Value: `$${stats.avgDealSize.toLocaleString()}` },
+        { Metric: 'Average Deal Size', Value: `₹${stats.avgDealSize.toLocaleString('en-IN')}` },
       ]);
       wb.Sheets['Opportunities'] = XLSX.utils.json_to_sheet(flat.length > 0 ? flat : [{ Message: 'No opportunities found' }]);
       XLSX.utils.book_append_sheet(wb, wb.Sheets['Summary'], 'Summary');
@@ -77,9 +77,9 @@ class ReportService {
     if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
       wb.Sheets['Revenue'] = XLSX.utils.json_to_sheet([
-        { Metric: 'Total Revenue', Value: `$${totalRevenue.toLocaleString()}` },
+        { Metric: 'Total Revenue', Value: `₹${totalRevenue.toLocaleString('en-IN')}` },
         { Metric: 'Deals Won', Value: filtered.length },
-        { Metric: 'Average Deal', Value: `$${report.avgDeal.toLocaleString()}` },
+        { Metric: 'Average Deal', Value: `₹${report.avgDeal.toLocaleString('en-IN')}` },
       ]);
       const monthly = Object.entries(monthlyRevenue).map(([month, rev]) => ({ Month: month, Revenue: rev }));
       wb.Sheets['Monthly'] = XLSX.utils.json_to_sheet(monthly);
@@ -238,10 +238,10 @@ class ReportService {
       doc.fontSize(14).text('Summary');
       doc.fontSize(10);
       doc.text(`Total Opportunities: ${stats.totalOpps}`);
-      doc.text(`Pipeline Value: $${stats.totalValue.toLocaleString()}`);
-      doc.text(`Won Revenue: $${stats.wonValue.toLocaleString()}`);
+      doc.text(`Pipeline Value: ₹${stats.totalValue.toLocaleString('en-IN')}`);
+      doc.text(`Won Revenue: ₹${stats.wonValue.toLocaleString('en-IN')}`);
       doc.text(`Win Rate: ${stats.winRate}%`);
-      doc.text(`Average Deal Size: $${stats.avgDealSize.toLocaleString()}`);
+      doc.text(`Average Deal Size: ₹${stats.avgDealSize.toLocaleString('en-IN')}`);
       doc.moveDown();
 
       // Table
@@ -260,7 +260,7 @@ class ReportService {
           y += 15;
           if (y > 700) { doc.addPage(); y = 50; }
           cols.forEach((col, i) => {
-            const val = col === 'amount' ? `$${parseFloat(row[col] || 0).toLocaleString()}` : (row[col] || '');
+            const val = col === 'amount' ? `₹${parseFloat(row[col] || 0).toLocaleString('en-IN')}` : (row[col] || '');
             doc.text(String(val).substring(0, 40), 50 + colWidths.slice(0, i).reduce((a, b) => a + b, 0), y, { width: colWidths[i] });
           });
         });

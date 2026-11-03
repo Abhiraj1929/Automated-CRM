@@ -112,9 +112,9 @@ function SignupContent() {
   }
 
   const planLabels: Record<string, string> = {
-    starter: "Starter ($19/mo)",
-    pro: "Pro ($49/mo)",
-    enterprise: "Enterprise ($149/mo)",
+    starter: "Starter (₹19/mo)",
+    pro: "Pro (₹49/mo)",
+    enterprise: "Enterprise (₹149/mo)",
   };
 
   return (

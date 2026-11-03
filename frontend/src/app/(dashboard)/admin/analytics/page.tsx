@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  TrendingUp, Users, DollarSign, CheckSquare, BarChart3,
+  TrendingUp, Users, IndianRupee, CheckSquare, BarChart3,
   RefreshCw, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
 
@@ -63,18 +63,18 @@ export default function AdminAnalyticsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Pipeline</p>
-                      <p className="text-2xl font-bold mt-1">${(data.total_pipeline_value || 0).toLocaleString()}</p>
+                      <p className="text-2xl font-bold mt-1">₹{(data.total_pipeline_value || 0).toLocaleString("en-IN")}</p>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                      <DollarSign className="h-5 w-5 text-blue-600" />
+                      <IndianRupee className="h-5 w-5 text-blue-600" />
                     </div>
                   </div>
                   <div className="flex gap-3 mt-2">
                     <span className="text-xs text-green-600 flex items-center gap-0.5">
-                      <ArrowUpRight className="h-3 w-3" />Won ${(data.won_value || 0).toLocaleString()}
+                      <ArrowUpRight className="h-3 w-3" />Won ₹{(data.won_value || 0).toLocaleString("en-IN")}
                     </span>
                     <span className="text-xs text-red-500 flex items-center gap-0.5">
-                      <ArrowDownRight className="h-3 w-3" />Lost ${(data.lost_value || 0).toLocaleString()}
+                      <ArrowDownRight className="h-3 w-3" />Lost ₹{(data.lost_value || 0).toLocaleString("en-IN")}
                     </span>
                   </div>
                 </CardContent>
@@ -143,7 +143,7 @@ export default function AdminAnalyticsPage() {
                         <div key={stage}>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-medium capitalize">{stage.replace(/_/g, " ")}</span>
-                            <span className="text-xs text-muted-foreground">{info.count} opps · ${(info.value || 0).toLocaleString()}</span>
+                            <span className="text-xs text-muted-foreground">{info.count} opps · ₹{(info.value || 0).toLocaleString("en-IN")}</span>
                           </div>
                           <div className="h-2 rounded-full bg-muted overflow-hidden">
                             <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.max((info.value / maxVal) * 100, 2)}%` }} />
@@ -203,7 +203,7 @@ export default function AdminAnalyticsPage() {
                         </div>
                         <p className="text-[10px] font-medium text-muted-foreground">{m.label}</p>
                         <p className="text-xs font-bold">{m.leads}</p>
-                        <p className="text-[10px] text-muted-foreground">${(m.pipeline_value || 0).toLocaleString()}</p>
+                        <p className="text-[10px] text-muted-foreground">₹{(m.pipeline_value || 0).toLocaleString("en-IN")}</p>
                       </div>
                     );
                   })}
@@ -239,7 +239,7 @@ export default function AdminAnalyticsPage() {
                           </td>
                           <td className="px-5 py-3">{tp.leads}</td>
                           <td className="px-5 py-3">{tp.opportunities}</td>
-                          <td className="px-5 py-3">${(tp.pipeline_value || 0).toLocaleString()}</td>
+                          <td className="px-5 py-3">₹{(tp.pipeline_value || 0).toLocaleString("en-IN")}</td>
                           <td className="px-5 py-3">{tp.completed_activities}/{tp.activities}</td>
                         </tr>
                       ))}

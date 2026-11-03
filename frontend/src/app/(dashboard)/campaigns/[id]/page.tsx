@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { apiClient } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import type { Campaign, CampaignResponse } from "@/types/crm";
-import { ArrowLeft, Loader2, Megaphone, Users, DollarSign, TrendingUp, Target, Mail, Phone, MessageSquare, Plus, X, Trash2, Eye } from "lucide-react";
+import { ArrowLeft, Loader2, Megaphone, Users, IndianRupee, TrendingUp, Target, Mail, Phone, MessageSquare, Plus, X, Trash2, Eye } from "lucide-react";
 import Link from "next/link";
 
 const STATUS_COLORS: Record<string, string> = { planning: "bg-slate-100 text-slate-700", active: "bg-emerald-100 text-emerald-700", paused: "bg-amber-100 text-amber-700", completed: "bg-blue-100 text-blue-700", cancelled: "bg-red-100 text-red-700" };
@@ -195,7 +195,7 @@ export default function CampaignDetailPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div><p className="text-xs font-medium" style={{ color: "hsl(220, 9%, 46%)" }}>Cost / Lead</p><p className="text-2xl font-bold mt-1">{formatCurrency(+costPerLead)}</p><p className="text-xs" style={{ color: "hsl(220, 9%, 46%)" }}>Budget: {formatCurrency(campaign.budget)}</p></div>
-                <DollarSign className="h-8 w-8" style={{ color: "hsl(220, 9%, 46%)", opacity: 0.2 }} />
+                <IndianRupee className="h-8 w-8" style={{ color: "hsl(220, 9%, 46%)", opacity: 0.2 }} />
               </div>
             </CardContent>
           </Card>

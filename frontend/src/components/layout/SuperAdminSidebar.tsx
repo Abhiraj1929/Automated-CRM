@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   Building2,
   Activity,
-  DollarSign,
+  IndianRupee,
   Users,
   Settings,
   ChevronLeft,

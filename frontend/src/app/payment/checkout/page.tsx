@@ -104,7 +104,7 @@ function DevCheckoutForm({
 
       <Button type="submit" className="h-12 w-full text-base font-semibold" disabled={processing}>
         <Lock className="mr-2 h-4 w-4" />
-        Start Free Trial — ${price}/mo
+        Start Free Trial — ₹{price}/mo
       </Button>
 
       <div className="flex items-center justify-center gap-4 pt-1">
@@ -198,7 +198,7 @@ function StripeCheckoutForm({
 
       <Button type="submit" className="h-12 w-full text-base font-semibold" disabled={!stripe || processing}>
         <Lock className="mr-2 h-4 w-4" />
-        Start Free Trial — ${price}/mo
+        Start Free Trial — ₹{price}/mo
       </Button>
 
       <div className="flex items-center justify-center gap-4 pt-1">
@@ -341,7 +341,7 @@ function CheckoutContent() {
                   <p className="text-xs" style={{ color: "hsl(220, 9%, 46%)" }}>{billing === "annual" ? "Billed annually" : "Billed monthly"}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>${price}</p>
+                  <p className="text-2xl font-bold" style={{ color: "hsl(220, 13%, 18%)" }}>₹{price}</p>
                   <p className="text-xs" style={{ color: "hsl(220, 9%, 46%)" }}>/month</p>
                 </div>
               </div>
@@ -357,7 +357,7 @@ function CheckoutContent() {
               {billing === "annual" && (
                 <div className="mt-4 rounded-lg p-3" style={{ backgroundColor: "hsl(160, 60%, 40% / 0.08)" }}>
                   <p className="text-xs font-medium" style={{ color: "hsl(160, 60%, 40%)" }}>
-                    You save ${(planInfo.price - planInfo.annual) * 12}/year
+                    You save ₹{(planInfo.price - planInfo.annual) * 12}/year
                   </p>
                 </div>
               )}

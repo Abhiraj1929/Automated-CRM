@@ -100,7 +100,7 @@ export default function AdminOrganizationsPage() {
                   <div className="text-right">
                     <Badge variant="secondary" className="text-sm font-medium mb-1">
                       {planLabels[org.plan] || org.plan}
-                      {planPrices[org.plan] && <span className="ml-1 text-muted-foreground text-xs">${planPrices[org.plan]}/mo</span>}
+                      {planPrices[org.plan] && <span className="ml-1 text-muted-foreground text-xs">₹{planPrices[org.plan]}/mo</span>}
                     </Badge>
                     <div>{statusBadge(org.payment_status, org.trial_days_left)}</div>
                   </div>

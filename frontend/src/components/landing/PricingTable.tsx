@@ -194,7 +194,7 @@ export function PricingTable() {
                     className="text-4xl font-bold"
                     style={{ color: "hsl(220, 13%, 18%)" }}
                   >
-                    ${price}
+                    ₹{price}
                   </span>
                   <span
                     className="text-sm"
@@ -205,7 +205,7 @@ export function PricingTable() {
                 </div>
                 {annual && (
                   <p className="mt-1 text-xs text-green-600 font-medium">
-                    Billed ${price * 12}/year
+                    Billed ₹{price * 12}/year
                   </p>
                 )}
 

@@ -133,7 +133,7 @@ export function Hero() {
                     deals: [
                       {
                         name: "Acme Corp",
-                        value: "$24,500",
+                        value: "₹24,500",
                         score: 92,
                         color: "green",
                       },
@@ -144,7 +144,7 @@ export function Hero() {
                     deals: [
                       {
                         name: "TechStart Inc",
-                        value: "$18,200",
+                        value: "₹18,200",
                         score: 78,
                         color: "blue",
                       },
@@ -155,7 +155,7 @@ export function Hero() {
                     deals: [
                       {
                         name: "GlobalSoft",
-                        value: "$42,000",
+                        value: "₹42,000",
                         score: 95,
                         color: "green",
                       },
@@ -236,7 +236,7 @@ export function Hero() {
                   {
                     icon: TrendingUp,
                     label: "Pipeline",
-                    value: "$84.7K",
+                    value: "₹84.7K",
                   },
                   { icon: Users, label: "Leads", value: "1,247" },
                   { icon: Bot, label: "AI Score", value: "92%" },
