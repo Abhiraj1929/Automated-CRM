@@ -111,7 +111,7 @@ for i in range(30):
         "status": status, "rating": rating,
         "annual_revenue": None, "number_of_employees": None,
         "website": None,
-        "description": f"Budget: ${budget:,} | Type: {property_type} | Location: {location} | Tours: {tours} | Views: {views} | Pre-approved: {pre_approved}",
+        "description": f"Budget: ₹{budget:,} | Type: {property_type} | Location: {location} | Tours: {tours} | Views: {views} | Pre-approved: {pre_approved}",
         "owner_id": random.choice(OWNERS), "created_by": ADMIN_ID,
         "created_at": created,
     })
@@ -155,7 +155,7 @@ for i in range(30):
         "annual_revenue": round(avg_order * orders, 2) if orders > 0 else None,
         "number_of_employees": None,
         "website": None,
-        "description": f"Cart: ${cart_value} | Items: {items} | Past Orders: {orders} | Avg Order: ${avg_order} | Loyalty: {loyalty} | Abandoned: {abandoned}",
+        "description": f"Cart: ₹{cart_value} | Items: {items} | Past Orders: {orders} | Avg Order: ₹{avg_order} | Loyalty: {loyalty} | Abandoned: {abandoned}",
         "owner_id": random.choice(OWNERS), "created_by": ADMIN_ID,
         "created_at": created,
     })
@@ -199,7 +199,7 @@ for i in range(30):
         "annual_revenue": budget * 3,
         "number_of_employees": random.randint(5, 500),
         "website": f"https://www.{ps_last[i].lower()}assoc.com",
-        "description": f"Budget: ${budget:,} | Service: {random.choice(PS_SERVICES)} | Urgency: {urgency} | Consultation: {consultation}",
+        "description": f"Budget: ₹{budget:,} | Service: {random.choice(PS_SERVICES)} | Urgency: {urgency} | Consultation: {consultation}",
         "owner_id": random.choice(OWNERS), "created_by": ADMIN_ID,
         "created_at": created,
     })

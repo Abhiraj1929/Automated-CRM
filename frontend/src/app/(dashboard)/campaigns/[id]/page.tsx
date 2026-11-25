@@ -359,8 +359,8 @@ export default function CampaignDetailPage() {
                   <div><Label>End Date</Label><Input type="date" value={editForm.end_date} onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })} className="mt-1.5" /></div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <div><Label>Budget ($)</Label><Input type="number" value={editForm.budget} onChange={(e) => setEditForm({ ...editForm, budget: e.target.value })} className="mt-1.5" /></div>
-                  <div><Label>Actual Cost ($)</Label><Input type="number" value={editForm.actual_cost} onChange={(e) => setEditForm({ ...editForm, actual_cost: e.target.value })} className="mt-1.5" /></div>
+                  <div><Label>Budget (₹)</Label><Input type="number" value={editForm.budget} onChange={(e) => setEditForm({ ...editForm, budget: e.target.value })} className="mt-1.5" /></div>
+                  <div><Label>Actual Cost (₹)</Label><Input type="number" value={editForm.actual_cost} onChange={(e) => setEditForm({ ...editForm, actual_cost: e.target.value })} className="mt-1.5" /></div>
                   <div><Label>Expected Leads</Label><Input type="number" value={editForm.expected_leads} onChange={(e) => setEditForm({ ...editForm, expected_leads: e.target.value })} className="mt-1.5" /></div>
                 </div>
                 <div><Label>Description</Label><textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={3} className="w-full rounded-md border bg-background px-3 py-2 text-sm mt-1.5" /></div>
